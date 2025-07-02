@@ -21,6 +21,9 @@ public class AutoFishingFeature {
     private static long lastDetectionTime = 0;
     private static boolean mouseWasGrabbed = false;
 
+    // Debug mode variables
+    private static boolean debugMode = false;
+
     // Anti-AFK variables
     private static boolean antiAfkEnabled = true; // Passive when mod starts
     private static int antiAfkTimer = 0;
@@ -93,6 +96,8 @@ public class AutoFishingFeature {
             restoreMouseGrab();
             // Keep fishing tracker always enabled - don't disable it
             emergencyStop = false;
+            // Deactivate sea creature killer when auto fishing stops
+            SeaCreatureKiller.setPassiveMode(false);
         } else {
             if (!performPreStartChecks()) {
                 enabled = false;
@@ -109,6 +114,8 @@ public class AutoFishingFeature {
             consecutiveFailures = 0;
             emergencyStop = false;
             serverConnectionLost = false;
+            // Activate sea creature killer when auto fishing starts
+            SeaCreatureKiller.setPassiveMode(true);
         }
 
         MinecraftClient client = MinecraftClient.getInstance();
@@ -315,6 +322,7 @@ public class AutoFishingFeature {
                 if (client.player.fishHook != null && hasBobberInWater(client.player)) {
                     currentState = FishingState.FISHING;
                     isFishing = true;
+                    sendDebugMessage("Bobber in water - State: CASTING → FISHING");
                 } else {
                     // Handle recast mechanism if bobber is not detected
                     handleRecastMechanism(client);
@@ -323,21 +331,19 @@ public class AutoFishingFeature {
 
             case FISHING:
                 if (client.player.fishHook == null) {
+                    sendDebugMessage("Bobber disappeared - resetting state");
                     resetFishingState();
                     delayTimer = 20;
                 } else if (hasBobberInWater(client.player) && detectArmorStandFishBite(client)) {
                     long currentTimeMillis = System.currentTimeMillis();
                     if (currentTimeMillis - lastDetectionTime >= DETECTION_COOLDOWN) {
                         lastDetectionTime = currentTimeMillis;
+                        sendDebugMessage("Fish detected! Reeling in...");
                         performSingleClick(client);
-                        // After catching a fish, set up bobber settling for the next cast
-                        currentState = FishingState.CASTING;
-                        isFishing = false;
-                        waitingForBobberSettle = true;
-                        bobberSettleTimer = BOBBER_SETTLE_DELAY;
-                        lastCastTime = currentTimeMillis;
-                        castAttempts = 0; // Reset cast attempts after successful fish
-                        delayTimer = 5; // Short delay before starting the settle wait
+                        // After catching a fish, reset to idle state and wait for bobber to settle
+                        resetFishingState();
+                        delayTimer = BOBBER_SETTLE_DELAY; // Wait for bobber to settle before next cast
+                        sendDebugMessage("Fish caught - waiting " + BOBBER_SETTLE_DELAY + " ticks before next cast");
                     }
                 }
                 break;
@@ -380,11 +386,6 @@ public class AutoFishingFeature {
             return false;
         }
 
-        // Check if player is drowning
-        if (client.player.isSubmergedInWater() && client.player.getAir() < 100) {
-            emergencyStopWithReason("Player is drowning");
-            return false;
-        }
 
         // Check if player is in lava
         if (client.player.isInLava()) {
@@ -459,11 +460,18 @@ public class AutoFishingFeature {
         client.interactionManager.interactItem(client.player, hand);
 
         currentState = FishingState.CASTING;
-        delayTimer = BOBBER_SETTLE_TIME;
+        // Use the proper bobber settling mechanism instead of a short delay
+        waitingForBobberSettle = true;
+        bobberSettleTimer = BOBBER_SETTLE_DELAY; // 40 ticks = 2 seconds
+        castAttempts = 1; // This is the first attempt
+        lastCastTime = System.currentTimeMillis();
         isFishing = false;
+
+        sendDebugMessage("Started casting - State: CASTING, Using bobber settle mechanism: " + BOBBER_SETTLE_DELAY + " ticks");
     }
 
     private static void resetFishingState() {
+        FishingState previousState = currentState;
         currentState = FishingState.IDLE;
         isFishing = false;
         castCooldownTimer = 0;
@@ -472,6 +480,8 @@ public class AutoFishingFeature {
         waitingForBobberSettle = false;
         bobberSettleTimer = 0;
         lastCastTime = 0;
+
+        sendDebugMessage("Reset fishing state - Previous: " + previousState + ", Current: IDLE");
     }
 
     private static void stop() {
@@ -516,132 +526,37 @@ public class AutoFishingFeature {
         }
     }
 
-    private static void performSingleClick(MinecraftClient client) {
-        if (client.player == null || client.interactionManager == null) {
-            consecutiveFailures++;
-            return;
-        }
-
-        try {
-            client.interactionManager.interactItem(client.player, Hand.MAIN_HAND);
-            lastSuccessfulFish = System.currentTimeMillis();
-            consecutiveFailures = 0; // Reset failure count on successful interaction
-        } catch (Exception e) {
-            consecutiveFailures++;
-            sendFailsafeMessage("Failed to interact with fishing rod: " + e.getMessage(), false);
-        }
-    }
-
-    private static boolean detectArmorStandFishBite(MinecraftClient client) {
-        if (client.player == null || client.world == null || !hasBobberInWater(client.player)) {
-            return false;
-        }
-
-        var entities = client.world.getEntities();
-        if (entities == null) return false;
-
-        for (Entity entity : entities) {
-            if (entity instanceof ArmorStandEntity armorStand) {
-                if (armorStand.hasCustomName()) {
-                    Text customName = armorStand.getCustomName();
-                    if (customName != null) {
-                        String nameString = customName.getString();
-                        if ("!!!".equals(nameString)) {
-                            double distance = armorStand.squaredDistanceTo(client.player);
-                            if (distance <= 50 * 50) {
-                                return true;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        return false;
-    }
-
-    private static void handleAntiAfk(MinecraftClient client) {
-        if (!antiAfkEnabled || client.player == null) return;
-
-        // Handle smooth movement to target position
-        if (isMovingToTarget) {
-            smoothSteps++;
-            float progress = (float) smoothSteps / SMOOTH_DURATION;
-
-            if (progress >= 1.0f) {
-                // Movement complete
-                client.player.setYaw(targetYaw);
-                client.player.setPitch(targetPitch);
-                lastYaw = targetYaw;
-                lastPitch = targetPitch;
-                isMovingToTarget = false;
-                smoothSteps = 0;
-
-                // Increment movement count after completing a movement
-                movementCount++;
+    // Method to toggle debug mode (for keybind)
+    public static void toggleDebugMode() {
+        debugMode = !debugMode;
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (client.player != null) {
+            Text prefix = Text.literal("[Fish Master] ").formatted(Formatting.AQUA, Formatting.BOLD);
+            if (debugMode) {
+                Text message = Text.literal("Debug mode enabled - additional info will be shown").formatted(Formatting.YELLOW);
+                client.player.sendMessage(prefix.copy().append(message), false);
             } else {
-                // Smooth interpolation using easing function
-                float easedProgress = easeInOutSine(progress);
-                float currentYaw = lerp(lastYaw, targetYaw, easedProgress);
-                float currentPitch = lerp(lastPitch, targetPitch, easedProgress);
-
-                client.player.setYaw(currentYaw);
-                client.player.setPitch(currentPitch);
+                Text message = Text.literal("Debug mode disabled").formatted(Formatting.GRAY);
+                client.player.sendMessage(prefix.copy().append(message), false);
             }
-            return;
-        }
-
-        antiAfkTimer++;
-
-        if (antiAfkTimer >= ANTI_AFK_INTERVAL) {
-            antiAfkTimer = 0;
-
-            // Check if it's time to return to original position
-            if (movementCount >= RETURN_TO_ORIGIN_INTERVAL) {
-                movementCount = 0;
-                targetYaw = originalYaw;
-                targetPitch = originalPitch;
-            } else {
-                // Generate random movement near original position
-                float maxDistanceFromOrigin = CROSSHAIR_MOVEMENT_RANGE * 1.5f;
-
-                // Calculate random offset but keep it within range of original position
-                float yawOffset = random.nextFloat() * CROSSHAIR_MOVEMENT_RANGE * 2 - CROSSHAIR_MOVEMENT_RANGE;
-                float pitchOffset = random.nextFloat() * (CROSSHAIR_MOVEMENT_RANGE * 1.2f) - (CROSSHAIR_MOVEMENT_RANGE * 0.6f);
-
-                // Calculate potential new position
-                float potentialYaw = originalYaw + yawOffset;
-                float potentialPitch = originalYaw + pitchOffset;
-
-                // Clamp to stay near original position
-                float yawDistanceFromOrigin = Math.abs(potentialYaw - originalYaw);
-                float pitchDistanceFromOrigin = Math.abs(potentialPitch - originalPitch);
-
-                if (yawDistanceFromOrigin > maxDistanceFromOrigin) {
-                    yawOffset = yawOffset > 0 ? maxDistanceFromOrigin : -maxDistanceFromOrigin;
-                }
-                if (pitchDistanceFromOrigin > maxDistanceFromOrigin) {
-                    pitchOffset = pitchOffset > 0 ? maxDistanceFromOrigin : -maxDistanceFromOrigin;
-                }
-
-                targetYaw = originalYaw + yawOffset;
-                targetPitch = Math.max(-90.0f, Math.min(90.0f, originalPitch + pitchOffset));
-            }
-
-            // Start smooth movement
-            isMovingToTarget = true;
-            smoothSteps = 0;
         }
     }
 
-    // Linear interpolation function
-    private static float lerp(float start, float end, float progress) {
-        return start + (end - start) * progress;
+    public static boolean isDebugMode() {
+        return debugMode;
     }
 
-    // Smooth easing function for natural movement
-    private static float easeInOutSine(float x) {
-        return (float) (-(Math.cos(Math.PI * x) - 1) / 2);
+    private static void sendDebugMessage(String message) {
+        if (debugMode) {
+            MinecraftClient client = MinecraftClient.getInstance();
+            if (client.player != null) {
+                Text prefix = Text.literal("[Debug] ").formatted(Formatting.DARK_PURPLE, Formatting.BOLD);
+                Text content = Text.literal(message).formatted(Formatting.LIGHT_PURPLE);
+                client.player.sendMessage(prefix.copy().append(content), false);
+            }
+        }
     }
+
     private static boolean switchToFishingRod() {
         MinecraftClient client = MinecraftClient.getInstance();
         if (client.player == null || client.interactionManager == null) return false;
@@ -684,7 +599,8 @@ public class AutoFishingFeature {
         if (bobber == null) {
             return false;
         }
-        return bobber.isTouchingWater();
+        // Check for both water and lava to support lava fishing on Hypixel Skyblock
+        return bobber.isTouchingWater() || bobber.isInLava();
     }
 
     private static void handleRecastMechanism(MinecraftClient client) {
@@ -798,5 +714,134 @@ public class AutoFishingFeature {
                 sendFailsafeMessage("Failed to cast bobber: " + e.getMessage(), false);
             }
         }
+    }
+
+    private static void performSingleClick(MinecraftClient client) {
+        if (client.player == null || client.interactionManager == null) {
+            consecutiveFailures++;
+            return;
+        }
+
+        try {
+            Hand hand = client.player.getStackInHand(Hand.MAIN_HAND).getItem() instanceof FishingRodItem ?
+                       Hand.MAIN_HAND : Hand.OFF_HAND;
+            client.interactionManager.interactItem(client.player, hand);
+            lastSuccessfulFish = System.currentTimeMillis();
+            consecutiveFailures = 0; // Reset failure count on successful interaction
+        } catch (Exception e) {
+            consecutiveFailures++;
+            sendFailsafeMessage("Failed to interact with fishing rod: " + e.getMessage(), false);
+        }
+    }
+
+    private static boolean detectArmorStandFishBite(MinecraftClient client) {
+        if (client.player == null || client.world == null || !hasBobberInWater(client.player)) {
+            return false;
+        }
+
+        var entities = client.world.getEntities();
+        if (entities == null) return false;
+
+        for (Entity entity : entities) {
+            if (entity instanceof ArmorStandEntity armorStand) {
+                if (armorStand.hasCustomName()) {
+                    Text customName = armorStand.getCustomName();
+                    if (customName != null) {
+                        String nameString = customName.getString();
+                        if ("!!!".equals(nameString)) {
+                            double distance = armorStand.squaredDistanceTo(client.player);
+                            if (distance <= 50 * 50) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    private static void handleAntiAfk(MinecraftClient client) {
+        if (!antiAfkEnabled || client.player == null) return;
+
+        // Handle smooth movement to target position
+        if (isMovingToTarget) {
+            smoothSteps++;
+            float progress = (float) smoothSteps / SMOOTH_DURATION;
+
+            if (progress >= 1.0f) {
+                // Movement complete
+                client.player.setYaw(targetYaw);
+                client.player.setPitch(targetPitch);
+                lastYaw = targetYaw;
+                lastPitch = targetPitch;
+                isMovingToTarget = false;
+                smoothSteps = 0;
+
+                // Increment movement count after completing a movement
+                movementCount++;
+            } else {
+                // Smooth interpolation using easing function
+                float easedProgress = easeInOutSine(progress);
+                float currentYaw = lerp(lastYaw, targetYaw, easedProgress);
+                float currentPitch = lerp(lastPitch, targetPitch, easedProgress);
+
+                client.player.setYaw(currentYaw);
+                client.player.setPitch(currentPitch);
+            }
+            return;
+        }
+
+        antiAfkTimer++;
+
+        if (antiAfkTimer >= ANTI_AFK_INTERVAL) {
+            antiAfkTimer = 0;
+
+            // Check if it's time to return to original position
+            if (movementCount >= RETURN_TO_ORIGIN_INTERVAL) {
+                movementCount = 0;
+                targetYaw = originalYaw;
+                targetPitch = originalPitch;
+            } else {
+                // Generate random movement near original position
+                float maxDistanceFromOrigin = CROSSHAIR_MOVEMENT_RANGE * 1.5f;
+
+                // Calculate random offset but keep it within range of original position
+                float yawOffset = random.nextFloat() * CROSSHAIR_MOVEMENT_RANGE * 2 - CROSSHAIR_MOVEMENT_RANGE;
+                float pitchOffset = random.nextFloat() * (CROSSHAIR_MOVEMENT_RANGE * 1.2f) - (CROSSHAIR_MOVEMENT_RANGE * 0.6f);
+
+                // Calculate potential new position
+                float potentialYaw = originalYaw + yawOffset;
+                float potentialPitch = originalPitch + pitchOffset;
+
+                // Clamp to stay near original position
+                float yawDistanceFromOrigin = Math.abs(potentialYaw - originalYaw);
+                float pitchDistanceFromOrigin = Math.abs(potentialPitch - originalPitch);
+
+                if (yawDistanceFromOrigin > maxDistanceFromOrigin) {
+                    yawOffset = yawOffset > 0 ? maxDistanceFromOrigin : -maxDistanceFromOrigin;
+                }
+                if (pitchDistanceFromOrigin > maxDistanceFromOrigin) {
+                    pitchOffset = pitchOffset > 0 ? maxDistanceFromOrigin : -maxDistanceFromOrigin;
+                }
+
+                targetYaw = originalYaw + yawOffset;
+                targetPitch = Math.max(-90.0f, Math.min(90.0f, originalPitch + pitchOffset));
+            }
+
+            // Start smooth movement
+            isMovingToTarget = true;
+            smoothSteps = 0;
+        }
+    }
+
+    // Linear interpolation function
+    private static float lerp(float start, float end, float progress) {
+        return start + (end - start) * progress;
+    }
+
+    // Smooth easing function for natural movement
+    private static float easeInOutSine(float x) {
+        return (float) (-(Math.cos(Math.PI * x) - 1) / 2);
     }
 }

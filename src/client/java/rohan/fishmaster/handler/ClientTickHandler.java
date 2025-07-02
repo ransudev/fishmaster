@@ -4,6 +4,7 @@ import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.minecraft.client.MinecraftClient;
 import rohan.fishmaster.config.KeyBindings;
 import rohan.fishmaster.feature.AutoFishingFeature;
+import rohan.fishmaster.feature.SeaCreatureKiller;
 
 public class ClientTickHandler {
 
@@ -20,6 +21,11 @@ public class ClientTickHandler {
         // Handle emergency stop
         if (KeyBindings.EMERGENCY_STOP.wasPressed()) {
             AutoFishingFeature.emergencyStop();
+        }
+
+        // Handle sea creature killer toggle
+        if (KeyBindings.TOGGLE_SEA_CREATURE_KILLER.wasPressed()) {
+            SeaCreatureKiller.toggle();
         }
     }
 }

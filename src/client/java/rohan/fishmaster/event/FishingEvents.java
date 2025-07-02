@@ -38,8 +38,10 @@ public class FishingEvents {
 
         // Register join event to reset failsafe state
         ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> {
-            // Reset any emergency states when joining a server
-            AutoFishingFeature.onServerSwitch();
+            // Only trigger world change detection if auto fishing is currently enabled
+            if (AutoFishingFeature.isEnabled()) {
+                AutoFishingFeature.onServerSwitch();
+            }
         });
 
         // Load fishing data and config - but DON'T register keybindings here
