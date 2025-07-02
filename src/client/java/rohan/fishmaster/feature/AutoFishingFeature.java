@@ -48,6 +48,16 @@ public class AutoFishingFeature {
     private static long lastHealthCheck = 0;
     private static boolean serverConnectionLost = false;
 
+    // Recast mechanism variables
+    private static int castAttempts = 0;
+    private static long lastCastTime = 0;
+    private static boolean waitingForBobberSettle = false;
+    private static int bobberSettleTimer = 0;
+    private static final int MAX_CAST_ATTEMPTS = 5;
+    private static final long CAST_TIMEOUT = 3000; // 3 seconds to wait for bobber to settle
+    private static final int BOBBER_SETTLE_DELAY = 40; // 2 seconds in ticks
+    private static final int RECAST_DELAY = 10; // 0.5 seconds between recast attempts
+
     // Player movement detection for failsafe
     private static double lastPlayerX = 0;
     private static double lastPlayerY = 0;
@@ -71,9 +81,8 @@ public class AutoFishingFeature {
     private static final float CROSSHAIR_MOVEMENT_RANGE = 2.5f; // Decreased movement range (was 5.0f)
 
     static {
-        // Initialize fishing events
-        rohan.fishmaster.event.FishingEvents.register();
-        rohan.fishmaster.event.ChatEvents.register();
+        // Initialize fishing events - but don't register keybindings here
+        // KeyBindings are now registered in FishMasterClient.onInitializeClient()
     }
 
     public static void toggle() {
@@ -82,8 +91,7 @@ public class AutoFishingFeature {
             stop();
             AutoFishingRenderer.reset();
             restoreMouseGrab();
-            // Disable fishing tracker when mod is disabled
-            FishMasterConfig.setFishingTrackerEnabled(false);
+            // Keep fishing tracker always enabled - don't disable it
             emergencyStop = false;
         } else {
             if (!performPreStartChecks()) {
@@ -94,7 +102,7 @@ public class AutoFishingFeature {
             ungrabMouse();
             // Initialize anti-AFK when mod starts
             initializeAntiAfk();
-            // Enable fishing tracker when mod is enabled
+            // Ensure fishing tracker is always enabled
             FishMasterConfig.setFishingTrackerEnabled(true);
             sessionStartTime = System.currentTimeMillis();
             lastSuccessfulFish = sessionStartTime;
@@ -107,11 +115,11 @@ public class AutoFishingFeature {
         if (client.player != null) {
             if (enabled) {
                 Text prefix = Text.literal("[Fish Master] ").formatted(Formatting.AQUA, Formatting.BOLD);
-                Text message = Text.literal("Auto fishing enabled (mouse ungrabbed, anti-AFK active)").formatted(Formatting.GREEN);
+                Text message = Text.literal("Auto fishing enabled (mouse ungrabbed, anti-AFK active, tracker always on)").formatted(Formatting.GREEN);
                 client.player.sendMessage(prefix.copy().append(message), false);
             } else {
                 Text prefix = Text.literal("[Fish Master] ").formatted(Formatting.AQUA, Formatting.BOLD);
-                Text message = Text.literal("Auto fishing disabled (mouse restored, anti-AFK disabled)").formatted(Formatting.RED);
+                Text message = Text.literal("Auto fishing disabled (mouse restored, anti-AFK disabled, tracker remains on)").formatted(Formatting.RED);
                 client.player.sendMessage(prefix.copy().append(message), false);
             }
         }
@@ -307,6 +315,9 @@ public class AutoFishingFeature {
                 if (client.player.fishHook != null && hasBobberInWater(client.player)) {
                     currentState = FishingState.FISHING;
                     isFishing = true;
+                } else {
+                    // Handle recast mechanism if bobber is not detected
+                    handleRecastMechanism(client);
                 }
                 break;
 
@@ -450,6 +461,11 @@ public class AutoFishingFeature {
         currentState = FishingState.IDLE;
         isFishing = false;
         castCooldownTimer = 0;
+        // Reset recast mechanism variables
+        castAttempts = 0;
+        waitingForBobberSettle = false;
+        bobberSettleTimer = 0;
+        lastCastTime = 0;
     }
 
     private static void stop() {
@@ -663,5 +679,118 @@ public class AutoFishingFeature {
             return false;
         }
         return bobber.isTouchingWater();
+    }
+
+    private static void handleRecastMechanism(MinecraftClient client) {
+        if (client.player == null || client.world == null || client.interactionManager == null) {
+            return;
+        }
+
+        long currentTime = System.currentTimeMillis();
+
+        // Check if we are waiting for the bobber to settle
+        if (waitingForBobberSettle) {
+            if (bobberSettleTimer > 0) {
+                bobberSettleTimer--;
+                return;
+            } else {
+                // Check if bobber is now in water after settling
+                if (client.player.fishHook != null && hasBobberInWater(client.player)) {
+                    // Success! Bobber is in water
+                    currentState = FishingState.FISHING;
+                    isFishing = true;
+                    waitingForBobberSettle = false;
+                    int successfulAttempts = castAttempts;
+                    castAttempts = 0; // Reset cast attempts on success
+                    if (successfulAttempts > 1) {
+                        sendFailsafeMessage("Bobber successfully cast after " + successfulAttempts + " attempts", false);
+                    }
+                    return;
+                } else {
+                    // Still not in water, prepare for recast
+                    waitingForBobberSettle = false;
+                }
+            }
+        }
+
+        // Check if we've exceeded maximum cast attempts
+        if (castAttempts >= MAX_CAST_ATTEMPTS) {
+            // Wait before trying again
+            if (currentTime - lastCastTime >= CAST_TIMEOUT) {
+                sendFailsafeMessage("Failed to cast bobber after " + MAX_CAST_ATTEMPTS + " attempts. Retrying...", false);
+                castAttempts = 0;
+                consecutiveFailures++;
+                lastCastTime = currentTime; // Reset the timer
+
+                // If too many consecutive failures, trigger emergency stop
+                if (consecutiveFailures >= Math.max(3, FishMasterConfig.getMaxConsecutiveFailures() / 2)) {
+                    emergencyStopWithReason("Too many failed cast attempts - possible obstruction or invalid fishing area");
+                    return;
+                }
+            }
+            return;
+        }
+
+        // Check if enough time has passed since last cast attempt
+        if (currentTime - lastCastTime < RECAST_DELAY * 100) { // Convert to milliseconds
+            return;
+        }
+
+        // Ensure we have a valid fishing rod before attempting to cast
+        if (!hasValidFishingRod()) {
+            if (!switchToFishingRod()) {
+                emergencyStopWithReason("No valid fishing rod available for recasting");
+                return;
+            }
+        }
+
+        // If we have a bobber but it's not in water, reel it in first
+        if (client.player.fishHook != null && !hasBobberInWater(client.player)) {
+            try {
+                Hand hand = client.player.getStackInHand(Hand.MAIN_HAND).getItem() instanceof FishingRodItem ?
+                           Hand.MAIN_HAND : Hand.OFF_HAND;
+                client.interactionManager.interactItem(client.player, hand);
+                delayTimer = RECAST_DELAY; // Wait before recasting
+                lastCastTime = currentTime;
+            } catch (Exception e) {
+                castAttempts++;
+                sendFailsafeMessage("Failed to reel in bobber: " + e.getMessage(), false);
+            }
+        } else if (client.player.fishHook == null) {
+            // No bobber exists, try to cast
+            try {
+                Hand hand = client.player.getStackInHand(Hand.MAIN_HAND).getItem() instanceof FishingRodItem ?
+                           Hand.MAIN_HAND : Hand.OFF_HAND;
+
+                // Verify the fishing rod is valid before casting
+                ItemStack rodStack = client.player.getStackInHand(hand);
+                if (!(rodStack.getItem() instanceof FishingRodItem) || rodStack.isEmpty()) {
+                    // Try the other hand
+                    hand = hand == Hand.MAIN_HAND ? Hand.OFF_HAND : Hand.MAIN_HAND;
+                    rodStack = client.player.getStackInHand(hand);
+                    if (!(rodStack.getItem() instanceof FishingRodItem) || rodStack.isEmpty()) {
+                        castAttempts++;
+                        sendFailsafeMessage("No valid fishing rod in hands for casting", false);
+                        return;
+                    }
+                }
+
+                client.interactionManager.interactItem(client.player, hand);
+
+                castAttempts++;
+                lastCastTime = currentTime;
+                waitingForBobberSettle = true;
+                bobberSettleTimer = BOBBER_SETTLE_DELAY;
+
+                if (castAttempts > 1) {
+                    sendFailsafeMessage("Recasting bobber (attempt " + castAttempts + "/" + MAX_CAST_ATTEMPTS + ")", false);
+                }
+            } catch (Exception e) {
+                castAttempts++;
+                consecutiveFailures++;
+                lastCastTime = currentTime;
+                sendFailsafeMessage("Failed to cast bobber: " + e.getMessage(), false);
+            }
+        }
     }
 }

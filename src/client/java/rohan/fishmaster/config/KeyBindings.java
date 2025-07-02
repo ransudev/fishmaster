@@ -6,13 +6,6 @@ import net.minecraft.client.util.InputUtil;
 import org.lwjgl.glfw.GLFW;
 
 public class KeyBindings {
-    public static final KeyBinding TOGGLE_FISHING_TRACKER = new KeyBinding(
-        "key.fishmaster.toggle_tracker",
-        InputUtil.Type.KEYSYM,
-        GLFW.GLFW_KEY_J,
-        "category.fishmaster.general"
-    );
-
     public static final KeyBinding TOGGLE_AUTO_FISHING = new KeyBinding(
         "key.fishmaster.toggle_auto_fishing",
         InputUtil.Type.KEYSYM,
@@ -28,16 +21,11 @@ public class KeyBindings {
     );
 
     public static void register() {
-        KeyBindingHelper.registerKeyBinding(TOGGLE_FISHING_TRACKER);
         KeyBindingHelper.registerKeyBinding(TOGGLE_AUTO_FISHING);
         KeyBindingHelper.registerKeyBinding(EMERGENCY_STOP);
     }
 
     public static void onKey() {
-        while (TOGGLE_FISHING_TRACKER.wasPressed()) {
-            FishMasterConfig.toggleFishingTracker();
-        }
-
         while (TOGGLE_AUTO_FISHING.wasPressed()) {
             rohan.fishmaster.feature.AutoFishingFeature.toggle();
         }

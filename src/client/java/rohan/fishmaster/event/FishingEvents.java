@@ -42,10 +42,10 @@ public class FishingEvents {
             AutoFishingFeature.onServerSwitch();
         });
 
-        // Load fishing data and config
+        // Load fishing data and config - but DON'T register keybindings here
         FishingData.load();
         FishMasterConfig.load();
-        KeyBindings.register();
+        // KeyBindings.register(); // This is now handled in FishMasterClient.onInitializeClient()
     }
 
     public static void onGameExit() {

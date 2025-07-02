@@ -1,6 +1,9 @@
 {
-  "key.fishmaster.auto_fish_toggle": "Toggle Auto Fishing",
-  "category.fishmaster.general": "FishMaster",
-  "key.fishmaster.toggle_detector": "Toggle Fish Detector",
-  "category.fishmaster": "FishMaster"
+  "key.fishmaster.toggle_auto_fishing": "§bToggle Auto Fishing",
+  "key.fishmaster.emergency_stop": "§cEmergency Stop",
+  "category.fishmaster.general": "§b§lFish§3§lMaster §7- §aGeneral",
+  "category.fishmaster.safety": "§b§lFish§3§lMaster §7- §cSafety",
+  "key.fishmaster.auto_fish_toggle": "§bToggle Auto Fishing",
+  "key.fishmaster.toggle_detector": "§3Toggle Fish Detector",
+  "category.fishmaster": "§b§lFish§3§lMaster"
 }
