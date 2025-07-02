@@ -330,8 +330,14 @@ public class AutoFishingFeature {
                     if (currentTimeMillis - lastDetectionTime >= DETECTION_COOLDOWN) {
                         lastDetectionTime = currentTimeMillis;
                         performSingleClick(client);
-                        resetFishingState();
-                        delayTimer = 10;
+                        // After catching a fish, set up bobber settling for the next cast
+                        currentState = FishingState.CASTING;
+                        isFishing = false;
+                        waitingForBobberSettle = true;
+                        bobberSettleTimer = BOBBER_SETTLE_DELAY;
+                        lastCastTime = currentTimeMillis;
+                        castAttempts = 0; // Reset cast attempts after successful fish
+                        delayTimer = 5; // Short delay before starting the settle wait
                     }
                 }
                 break;
