@@ -1,0 +1,12 @@
+{
+	"required": true,
+	"package": "rohan.fishmaster.mixin.client",
+	"compatibilityLevel": "JAVA_21",
+	"client": [
+		"FishingBobberEntityMixin",
+		"InGameHudMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}
