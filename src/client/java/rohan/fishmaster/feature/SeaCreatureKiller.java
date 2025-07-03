@@ -103,6 +103,7 @@ public class SeaCreatureKiller {
         TARGET_CREATURES.add("Plhlegblast");
         TARGET_CREATURES.add("Thunder");
         TARGET_CREATURES.add("Lord Jawbus");
+        TARGET_CREATURES.add("The Loch Emperor");
     }
 
     public static boolean isEnabled() {
