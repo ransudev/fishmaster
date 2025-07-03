@@ -10,6 +10,7 @@ import rohan.fishmaster.config.KeyBindings;
 import rohan.fishmaster.feature.AutoFishingFeature;
 import rohan.fishmaster.command.FishMasterCommand;
 import rohan.fishmaster.gui.PauseMenuIntegration;
+import rohan.fishmaster.gui.FishMasterSettings;
 
 public class FishMasterClient implements ClientModInitializer {
 

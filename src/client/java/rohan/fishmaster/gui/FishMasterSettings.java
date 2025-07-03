@@ -237,7 +237,7 @@ public class FishMasterSettings {
     }
 
     // Essential GUI Integration Methods (for future Essential compatibility)
-    public void openGui() {
+    public static void openGui() {
         MinecraftClient client = MinecraftClient.getInstance();
         if (client != null) {
             // Open the FishMaster settings screen
@@ -251,11 +251,41 @@ public class FishMasterSettings {
     }
 
     public int getSecondaryColor() {
-        return 0x2ecc71; // Green accent
+        return 0x2c3e50; // Dark gray
     }
 
-    public int getErrorColor() {
-        return 0xe74c3c; // Red for warnings
+    // Keybind management methods
+    public void setKeybind(String keybindName, int newKeybindId) {
+        switch (keybindName.toLowerCase()) {
+            case "auto_fishing":
+                autoFishingKeybind = newKeybindId;
+                break;
+            case "sea_creature_killer":
+                seaCreatureKillerKeybind = newKeybindId;
+                break;
+            case "emergency_stop":
+                emergencyStopKeybind = newKeybindId;
+                break;
+            case "settings_gui":
+                settingsGuiKeybind = newKeybindId;
+                break;
+        }
+        saveSettings();
+        // Update the actual keybindings
+        rohan.fishmaster.config.KeyBindings.updateKeybindings();
+    }
+
+    public String getKeybindDisplayName(int keybindId) {
+        return rohan.fishmaster.config.KeyBindings.getKeyName(keybindId);
+    }
+
+    // Cycle through available keybinds
+    public int getNextKeybindId(int currentId) {
+        return (currentId + 1) % 21; // 0-20 available keybinds
+    }
+
+    public int getPreviousKeybindId(int currentId) {
+        return currentId == 0 ? 20 : currentId - 1;
     }
 
     // Method to toggle features via keybinds

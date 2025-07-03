@@ -40,6 +40,16 @@ public class SeaCreatureKiller {
     private static int killCount = 0;
     private static boolean inCombatMode = false;
 
+    // Smooth rotation transition variables
+    private static float originalYaw = 0.0f;
+    private static float originalPitch = 0.0f;
+    private static boolean isTransitioning = false;
+    private static long transitionStartTime = 0;
+    private static final long TRANSITION_DURATION = 300; // Faster 300ms transition (was 1000ms)
+    private static float transitionStartYaw = 0.0f;
+    private static float transitionStartPitch = 0.0f;
+    private static boolean isTransitioningToGround = false; // New: for startup transition
+
     // Set of specific sea creature names to target
     private static final Set<String> TARGET_CREATURES = new HashSet<>();
 
@@ -127,6 +137,7 @@ public class SeaCreatureKiller {
                     .append(Text.literal("DISABLED").formatted(Formatting.BOLD, Formatting.RED)), false);
                 targetEntity = null;
                 inCombatMode = false;
+                isTransitioning = false; // Stop any ongoing transition
             }
         }
     }
@@ -147,6 +158,7 @@ public class SeaCreatureKiller {
                     .append(Text.literal("PASSIVE MODE DEACTIVATED").formatted(Formatting.BOLD, Formatting.GRAY)), false);
                 targetEntity = null;
                 inCombatMode = false;
+                isTransitioning = false; // Stop any ongoing transition
             }
         }
     }
@@ -169,19 +181,22 @@ public class SeaCreatureKiller {
                 client.player.sendMessage(Text.literal("Combat Mode: ").formatted(Formatting.RED)
                     .append(Text.literal("DEACTIVATED").formatted(Formatting.BOLD, Formatting.GRAY))
                     .append(Text.literal(" - Target lost").formatted(Formatting.GRAY)), false);
+
+                // Start smooth transition back to original rotation
+                startRotationTransition();
             }
 
             targetEntity = null;
             inCombatMode = false;
         }
 
-        // Find new target if we don't have one
-        if (targetEntity == null) {
+        // Find new target if we don't have one and not transitioning
+        if (targetEntity == null && !isTransitioning) {
             findNearestTargetCreature();
         }
 
         // Enter combat mode and attack if we have a target
-        if (targetEntity != null) {
+        if (targetEntity != null && !isTransitioning) {
             if (!inCombatMode) {
                 enterCombatMode();
             }
@@ -190,11 +205,48 @@ public class SeaCreatureKiller {
                 attackGround();
             }
         }
+
+        // Update rotation if transitioning
+        if (isTransitioning) {
+            updateRotation();
+        }
+
+        // New: Handle startup transition to ground
+        if (isTransitioningToGround) {
+            updateStartupRotation();
+        }
+    }
+
+    private static void startRotationTransition() {
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (client.player == null) {
+            return;
+        }
+
+        // Store the current rotation as the starting point for transition
+        transitionStartYaw = client.player.getYaw();
+        transitionStartPitch = client.player.getPitch();
+
+        // Start the transition
+        isTransitioning = true;
+        transitionStartTime = System.currentTimeMillis();
     }
 
     private static void enterCombatMode() {
-        inCombatMode = true;
+        // Store the original rotation before entering combat mode
         MinecraftClient client = MinecraftClient.getInstance();
+        if (client.player != null) {
+            originalYaw = client.player.getYaw();
+            originalPitch = client.player.getPitch();
+
+            // Start smooth transition to ground when entering combat mode
+            transitionStartYaw = client.player.getYaw();
+            transitionStartPitch = client.player.getPitch();
+            isTransitioningToGround = true;
+            transitionStartTime = System.currentTimeMillis();
+        }
+
+        inCombatMode = true;
         if (client.player != null) {
             client.player.sendMessage(Text.literal("Combat Mode: ").formatted(Formatting.RED)
                 .append(Text.literal("ACTIVATED").formatted(Formatting.BOLD, Formatting.RED))
@@ -402,7 +454,8 @@ public class SeaCreatureKiller {
                displayName.contains("midas's staff") ||
                displayName.contains("midas staff") ||
                displayName.contains("fire veil wand") ||
-               displayName.contains("fire veil");
+               displayName.contains("fire veil") ||
+               displayName.contains("hyperion");
     }
 
     private static void lookAtGround() {
@@ -422,6 +475,52 @@ public class SeaCreatureKiller {
         client.player.setPitch(targetPitch);
     }
 
+    private static void updateRotation() {
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (client.player == null) {
+            return;
+        }
+
+        // Calculate the rotation progress
+        long currentTime = System.currentTimeMillis();
+        float progress = MathHelper.clamp((currentTime - transitionStartTime) / (float)TRANSITION_DURATION, 0.0f, 1.0f);
+
+        // Smoothly interpolate the yaw and pitch
+        float newYaw = MathHelper.lerp(progress, transitionStartYaw, originalYaw);
+        float newPitch = MathHelper.lerp(progress, transitionStartPitch, originalPitch);
+
+        // Update the player's rotation
+        client.player.setYaw(newYaw);
+        client.player.setPitch(newPitch);
+
+        // If transition is complete, stop transitioning
+        if (progress >= 1.0f) {
+            isTransitioning = false;
+        }
+    }
+
+    private static void updateStartupRotation() {
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (client.player == null) {
+            return;
+        }
+
+        // Calculate the rotation progress
+        long currentTime = System.currentTimeMillis();
+        float progress = MathHelper.clamp((currentTime - transitionStartTime) / (float)TRANSITION_DURATION, 0.0f, 1.0f);
+
+        // Smoothly interpolate the pitch to look at the ground
+        float newPitch = MathHelper.lerp(progress, transitionStartPitch, 90.0f);
+
+        // Update the player's rotation
+        client.player.setPitch(newPitch);
+
+        // If transition is complete, stop transitioning
+        if (progress >= 1.0f) {
+            isTransitioningToGround = false;
+        }
+    }
+
     public static int getKillCount() {
         return killCount;
     }
@@ -435,5 +534,8 @@ public class SeaCreatureKiller {
         targetEntity = null;
         killCount = 0;
         lastAttackTime = 0;
+        inCombatMode = false;
+        isTransitioning = false; // Stop any ongoing transition
+        isTransitioningToGround = false; // Stop startup transition
     }
 }
