@@ -5,26 +5,17 @@ import net.minecraft.entity.Entity;
 import net.minecraft.entity.mob.*;
 import net.minecraft.entity.passive.SquidEntity;
 import net.minecraft.entity.passive.GlowSquidEntity;
-import net.minecraft.entity.passive.DolphinEntity;
-import net.minecraft.entity.passive.TurtleEntity;
-import net.minecraft.entity.passive.TropicalFishEntity;
-import net.minecraft.entity.passive.CodEntity;
-import net.minecraft.entity.passive.SalmonEntity;
-import net.minecraft.entity.passive.PufferfishEntity;
 import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.Hand;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.hit.HitResult;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.Direction;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.util.math.MathHelper;
-import net.minecraft.world.RaycastContext;
 
 import java.util.List;
 import java.util.Set;
@@ -40,15 +31,19 @@ public class SeaCreatureKiller {
     private static int killCount = 0;
     private static boolean inCombatMode = false;
 
-    // Smooth rotation transition variables
+    // Smooth rotation transition variables with mouse-like movement
     private static float originalYaw = 0.0f;
     private static float originalPitch = 0.0f;
     private static boolean isTransitioning = false;
     private static long transitionStartTime = 0;
-    private static final long TRANSITION_DURATION = 300; // Faster 300ms transition (was 1000ms)
+    private static final long TRANSITION_DURATION = 300; // Reduced from 800ms to 300ms for faster transitions
     private static float transitionStartYaw = 0.0f;
     private static float transitionStartPitch = 0.0f;
-    private static boolean isTransitioningToGround = false; // New: for startup transition
+    private static boolean isTransitioningToGround = false;
+
+    // Weapon switching delay variables
+    private static long lastWeaponSwitchTime = 600; // Start with a delay to allow initial weapon switch
+    private static final long WEAPON_SWITCH_DELAY = 800; // 800ms delay for realistic weapon switching
 
     // Set of specific sea creature names to target
     private static final Set<String> TARGET_CREATURES = new HashSet<>();
@@ -211,7 +206,7 @@ public class SeaCreatureKiller {
             updateRotation();
         }
 
-        // New: Handle startup transition to ground
+        // Handle startup transition to ground
         if (isTransitioningToGround) {
             updateStartupRotation();
         }
@@ -305,7 +300,7 @@ public class SeaCreatureKiller {
         if (entity == null) return "";
 
         // Try to get the display name first
-        if (entity.hasCustomName()) {
+        if (entity.hasCustomName() && entity.getCustomName() != null) {
             return entity.getCustomName().getString();
         }
 
@@ -322,8 +317,8 @@ public class SeaCreatureKiller {
         String[] words = typeName.split(" ");
         StringBuilder result = new StringBuilder();
         for (String word : words) {
-            if (result.length() > 0) result.append(" ");
-            if (word.length() > 0) {
+            if (!result.isEmpty()) result.append(" ");
+            if (!word.isEmpty()) {
                 result.append(word.substring(0, 1).toUpperCase());
                 if (word.length() > 1) {
                     result.append(word.substring(1).toLowerCase());
@@ -340,7 +335,7 @@ public class SeaCreatureKiller {
             return;
         }
 
-        // Check if we have a mage weapon and switch to it
+        // Check if we have a mage weapon and switch to it with delay
         if (!switchToMageWeapon()) {
             // No mage weapon found, send message and return
             if (client.player != null) {
@@ -400,12 +395,18 @@ public class SeaCreatureKiller {
             return true;
         }
 
+        // Check if enough time has passed since last switch for realistic delay
+        if (System.currentTimeMillis() - lastWeaponSwitchTime < WEAPON_SWITCH_DELAY) {
+            return false; // Still waiting for delay
+        }
+
         // Search for mage weapon in hotbar (slots 0-8)
         for (int i = 0; i < 9; i++) {
             ItemStack stack = client.player.getInventory().getStack(i);
             if (isMageWeapon(stack)) {
                 // Switch to this slot
                 client.player.getInventory().setSelectedSlot(i);
+                lastWeaponSwitchTime = System.currentTimeMillis(); // Update last switch time
                 return true;
             }
         }
@@ -438,11 +439,9 @@ public class SeaCreatureKiller {
                // Hypixel Skyblock specific mage weapons
                displayName.contains("bonzo") ||
                displayName.contains("frozen scythe") ||
-               displayName.contains("staff") ||
                displayName.contains("wither") && displayName.contains("shield") ||
                displayName.contains("jerry") ||
                displayName.contains("midas") ||
-               displayName.contains("spirit") ||
                displayName.contains("scorpion") ||
                displayName.contains("fire") && displayName.contains("rod") ||
                displayName.contains("ice") && displayName.contains("rod") ||
@@ -475,6 +474,7 @@ public class SeaCreatureKiller {
         client.player.setPitch(targetPitch);
     }
 
+    // Smooth rotation update using mouse-like movement with easing
     private static void updateRotation() {
         MinecraftClient client = MinecraftClient.getInstance();
         if (client.player == null) {
@@ -485,9 +485,12 @@ public class SeaCreatureKiller {
         long currentTime = System.currentTimeMillis();
         float progress = MathHelper.clamp((currentTime - transitionStartTime) / (float)TRANSITION_DURATION, 0.0f, 1.0f);
 
-        // Smoothly interpolate the yaw and pitch
-        float newYaw = MathHelper.lerp(progress, transitionStartYaw, originalYaw);
-        float newPitch = MathHelper.lerp(progress, transitionStartPitch, originalPitch);
+        // Apply smooth easing - mimics mouse movement acceleration and deceleration
+        float easedProgress = easeInOutCubic(progress);
+
+        // Smoothly interpolate the yaw and pitch using the eased progress
+        float newYaw = MathHelper.lerp(easedProgress, transitionStartYaw, originalYaw);
+        float newPitch = MathHelper.lerp(easedProgress, transitionStartPitch, originalPitch);
 
         // Update the player's rotation
         client.player.setYaw(newYaw);
@@ -509,8 +512,11 @@ public class SeaCreatureKiller {
         long currentTime = System.currentTimeMillis();
         float progress = MathHelper.clamp((currentTime - transitionStartTime) / (float)TRANSITION_DURATION, 0.0f, 1.0f);
 
+        // Apply smooth easing for natural mouse-like movement
+        float easedProgress = easeInOutCubic(progress);
+
         // Smoothly interpolate the pitch to look at the ground
-        float newPitch = MathHelper.lerp(progress, transitionStartPitch, 90.0f);
+        float newPitch = MathHelper.lerp(easedProgress, transitionStartPitch, 90.0f);
 
         // Update the player's rotation
         client.player.setPitch(newPitch);
@@ -518,6 +524,17 @@ public class SeaCreatureKiller {
         // If transition is complete, stop transitioning
         if (progress >= 1.0f) {
             isTransitioningToGround = false;
+        }
+    }
+
+    // Cubic easing function that mimics natural mouse movement
+    // Starts slow, accelerates in the middle, then decelerates at the end
+    private static float easeInOutCubic(float t) {
+        if (t < 0.5f) {
+            return 4.0f * t * t * t;
+        } else {
+            float f = 2.0f * t - 2.0f;
+            return 1.0f + f * f * f / 2.0f;
         }
     }
 
