@@ -40,10 +40,15 @@ public class SeaCreatureKiller {
     private static float transitionStartYaw = 0.0f;
     private static float transitionStartPitch = 0.0f;
     private static boolean isTransitioningToGround = false;
+    private static boolean canAttack = false; // Flag to control when attacking is allowed
 
-    // Weapon switching delay variables
-    private static long lastWeaponSwitchTime = 600; // Start with a delay to allow initial weapon switch
-    private static final long WEAPON_SWITCH_DELAY = 800; // 800ms delay for realistic weapon switching
+    // Weapon switching delay variables - made more realistic
+    private static long lastWeaponSwitchTime = 0;
+    private static final long WEAPON_SWITCH_DELAY = 1200; // 1.2 seconds between weapon switches
+    private static final long COMBAT_TO_FISHING_DELAY = 2000; // 2 seconds before switching back to fishing rod
+    private static int originalSlot = -1; // Remember original fishing rod slot
+    private static boolean needsToSwitchBack = false;
+    private static long combatEndTime = 0;
 
     // Set of specific sea creature names to target
     private static final Set<String> TARGET_CREATURES = new HashSet<>();
@@ -177,14 +182,19 @@ public class SeaCreatureKiller {
             return;
         }
 
+        // Handle weapon switching back to fishing rod after combat
+        if (needsToSwitchBack && System.currentTimeMillis() - combatEndTime > COMBAT_TO_FISHING_DELAY) {
+            switchBackToFishingRod();
+        }
+
         // Check if current target is still valid
         if (targetEntity != null && (targetEntity.isRemoved() || !isTargetSeaCreature(targetEntity) ||
             client.player.distanceTo(targetEntity) > DETECTION_RANGE)) {
 
             if (inCombatMode) {
-                client.player.sendMessage(Text.literal("Combat Mode: ").formatted(Formatting.RED)
-                    .append(Text.literal("DEACTIVATED").formatted(Formatting.BOLD, Formatting.GRAY))
-                    .append(Text.literal(" - Target lost").formatted(Formatting.GRAY)), false);
+                // Combat ended - set timer to switch back to fishing rod
+                combatEndTime = System.currentTimeMillis();
+                needsToSwitchBack = true;
 
                 // Start smooth transition back to original rotation
                 startRotationTransition();
@@ -192,6 +202,7 @@ public class SeaCreatureKiller {
 
             targetEntity = null;
             inCombatMode = false;
+            canAttack = false; // Reset attack flag
         }
 
         // Find new target if we don't have one and not transitioning
@@ -205,7 +216,8 @@ public class SeaCreatureKiller {
                 enterCombatMode();
             }
 
-            if (System.currentTimeMillis() - lastAttackTime > ATTACK_COOLDOWN) {
+            // Only attack if rotation to ground is complete and enough time has passed
+            if (canAttack && System.currentTimeMillis() - lastAttackTime > ATTACK_COOLDOWN) {
                 attackGround();
             }
         }
@@ -243,14 +255,22 @@ public class SeaCreatureKiller {
             originalYaw = client.player.getYaw();
             originalPitch = client.player.getPitch();
 
+            // Remember current slot (likely fishing rod)
+            originalSlot = client.player.getInventory().getSelectedSlot();
+
             // Start smooth transition to ground when entering combat mode
             transitionStartYaw = client.player.getYaw();
             transitionStartPitch = client.player.getPitch();
             isTransitioningToGround = true;
             transitionStartTime = System.currentTimeMillis();
+            canAttack = false; // Don't allow attacking until rotation is complete
+
+            // Reset weapon switch timer to add initial delay before switching to mage weapon
+            lastWeaponSwitchTime = System.currentTimeMillis();
         }
 
         inCombatMode = true;
+        needsToSwitchBack = false; // Reset switch back flag
         if (client.player != null) {
             client.player.sendMessage(Text.literal("SCK: ").formatted(Formatting.RED)
                 .append(Text.literal("COMBAT").formatted(Formatting.BOLD, Formatting.RED))
@@ -354,8 +374,8 @@ public class SeaCreatureKiller {
             return;
         }
 
-        // Look at the ground
-        lookAtGround();
+        // Player should already be looking at ground from the rotation transition
+        // No need to call lookAtGround() here since rotation is handled by updateStartupRotation()
 
         // Find ground position to attack
         Vec3d playerPos = client.player.getPos();
@@ -398,30 +418,71 @@ public class SeaCreatureKiller {
             return false;
         }
 
+        // Check if enough time has passed since last switch for realistic delay
+        long currentTime = System.currentTimeMillis();
+        if (currentTime - lastWeaponSwitchTime < WEAPON_SWITCH_DELAY) {
+            return false; // Still waiting for delay - don't allow any weapon operations
+        }
+
         // Check if current item is already a mage weapon
         ItemStack currentItem = client.player.getMainHandStack();
         if (isMageWeapon(currentItem)) {
             return true;
         }
 
-        // Check if enough time has passed since last switch for realistic delay
-        if (System.currentTimeMillis() - lastWeaponSwitchTime < WEAPON_SWITCH_DELAY) {
-            return false; // Still waiting for delay
-        }
 
         // Search for mage weapon in hotbar (slots 0-8)
         for (int i = 0; i < 9; i++) {
             ItemStack stack = client.player.getInventory().getStack(i);
             if (isMageWeapon(stack)) {
-                // Switch to this slot
+                // Switch to this slot with realistic delay
                 client.player.getInventory().setSelectedSlot(i);
-                lastWeaponSwitchTime = System.currentTimeMillis(); // Update last switch time
+                lastWeaponSwitchTime = currentTime;
                 return true;
             }
         }
 
         // No mage weapon found in hotbar
         return false;
+    }
+
+    private static void switchBackToFishingRod() {
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (client.player == null) {
+            return;
+        }
+
+        // Only switch back if we're not in combat and enough time has passed
+        if (inCombatMode || originalSlot == -1) {
+            return;
+        }
+
+        // Check if enough time has passed since last weapon switch
+        long currentTime = System.currentTimeMillis();
+        if (currentTime - lastWeaponSwitchTime < WEAPON_SWITCH_DELAY) {
+            return; // Still waiting for delay
+        }
+
+        // Switch back to original slot (fishing rod)
+        ItemStack originalItem = client.player.getInventory().getStack(originalSlot);
+        if (isFishingRod(originalItem)) {
+            client.player.getInventory().setSelectedSlot(originalSlot);
+            lastWeaponSwitchTime = currentTime;
+            needsToSwitchBack = false;
+            originalSlot = -1; // Reset
+        } else {
+            // Original slot doesn't have fishing rod anymore, find one
+            for (int i = 0; i < 9; i++) {
+                ItemStack stack = client.player.getInventory().getStack(i);
+                if (isFishingRod(stack)) {
+                    client.player.getInventory().setSelectedSlot(i);
+                    lastWeaponSwitchTime = currentTime;
+                    needsToSwitchBack = false;
+                    originalSlot = -1; // Reset
+                    break;
+                }
+            }
+        }
     }
 
     private static boolean isMageWeapon(ItemStack stack) {
@@ -464,6 +525,30 @@ public class SeaCreatureKiller {
                displayName.contains("fire veil wand") ||
                displayName.contains("fire veil") ||
                displayName.contains("hyperion");
+    }
+
+    private static boolean isFishingRod(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) {
+            return false;
+        }
+
+        String itemName = stack.getItem().toString().toLowerCase();
+        String displayName = stack.getName().getString().toLowerCase();
+
+        // Check for fishing rod patterns
+        return itemName.contains("fishing_rod") ||
+               displayName.contains("fishing rod") ||
+               displayName.contains("rod of the sea") ||
+               displayName.contains("auger rod") ||
+               displayName.contains("prismarine rod") ||
+               displayName.contains("winter rod") ||
+               displayName.contains("challenging rod") ||
+               displayName.contains("lucky rod") ||
+               displayName.contains("magma rod") ||
+               displayName.contains("lava rod") ||
+               displayName.contains("salty rod") ||
+               displayName.contains("rod of legends") ||
+               displayName.contains("rod of championing");
     }
 
     private static void lookAtGround() {
@@ -530,9 +615,10 @@ public class SeaCreatureKiller {
         // Update the player's rotation
         client.player.setPitch(newPitch);
 
-        // If transition is complete, stop transitioning
+        // If transition is complete, stop transitioning and allow attacking
         if (progress >= 1.0f) {
             isTransitioningToGround = false;
+            canAttack = true; // Now we can start attacking
         }
     }
 
@@ -561,7 +647,13 @@ public class SeaCreatureKiller {
         killCount = 0;
         lastAttackTime = 0;
         inCombatMode = false;
-        isTransitioning = false; // Stop any ongoing transition
-        isTransitioningToGround = false; // Stop startup transition
+        isTransitioning = false;
+        isTransitioningToGround = false;
+        canAttack = false; // Reset attack flag
+        // Reset weapon switching variables
+        needsToSwitchBack = false;
+        originalSlot = -1;
+        combatEndTime = 0;
+        lastWeaponSwitchTime = 0;
     }
 }

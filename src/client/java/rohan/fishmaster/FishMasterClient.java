@@ -14,8 +14,6 @@ import rohan.fishmaster.handler.DisconnectHandler;
 import rohan.fishmaster.config.KeyBindings;
 import rohan.fishmaster.feature.AutoFishingFeature;
 import rohan.fishmaster.command.FishMasterCommand;
-import rohan.fishmaster.gui.PauseMenuIntegration;
-import rohan.fishmaster.gui.FishMasterSettings;
 import net.minecraft.client.MinecraftClient;
 
 public class FishMasterClient implements ClientModInitializer {
@@ -100,23 +98,24 @@ public class FishMasterClient implements ClientModInitializer {
             ButtonWidget fishMasterButton = ButtonWidget.builder(
                 Text.literal("FishMaster").formatted(Formatting.AQUA),
                 button -> {
-                    try {
-                        // Close pause menu first
-                        client.setScreen(null);
+                    // Show status instead of opening GUI
+                    if (client.player != null) {
+                        boolean autoFishStatus = rohan.fishmaster.feature.AutoFishingFeature.isEnabled();
+                        boolean seaCreatureStatus = rohan.fishmaster.feature.SeaCreatureKiller.isEnabled();
 
-                        // Open FishMaster settings
-                        FishMasterSettings settings = FishMasterSettings.getInstance();
-                        settings.openGui();
+                        client.player.sendMessage(
+                            Text.literal("[FishMaster] ").formatted(Formatting.AQUA)
+                                .append(Text.literal("Status:").formatted(Formatting.WHITE)), false);
 
-                    } catch (Exception e) {
-                        // Send error message if something goes wrong
-                        if (client.player != null) {
-                            client.player.sendMessage(
-                                Text.literal("[FishMaster] ").formatted(Formatting.RED)
-                                    .append(Text.literal("Failed to open GUI: " + e.getMessage()).formatted(Formatting.WHITE)),
-                                false
-                            );
-                        }
+                        client.player.sendMessage(
+                            Text.literal("Auto Fishing: ").formatted(Formatting.GRAY)
+                                .append(Text.literal(autoFishStatus ? "ON" : "OFF")
+                                    .formatted(autoFishStatus ? Formatting.GREEN : Formatting.RED)), false);
+
+                        client.player.sendMessage(
+                            Text.literal("Sea Creature Killer: ").formatted(Formatting.GRAY)
+                                .append(Text.literal(seaCreatureStatus ? "ON" : "OFF")
+                                    .formatted(seaCreatureStatus ? Formatting.GREEN : Formatting.RED)), false);
                     }
                 })
                 .dimensions(buttonX, buttonY, buttonWidth, buttonHeight)

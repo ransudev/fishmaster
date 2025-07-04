@@ -444,6 +444,11 @@ public class AutoFishingFeature {
         SeaCreatureKiller.setAutoFishEnabled(false);
     }
 
+    // Public method for keybind emergency stop
+    public static void emergencyStop() {
+        emergencyStopWithReason("Manual emergency stop via keybind");
+    }
+
     private static void sendFailsafeMessage(String message, boolean isError) {
         MinecraftClient client = MinecraftClient.getInstance();
         if (client.player != null) {
@@ -525,12 +530,6 @@ public class AutoFishingFeature {
         }
     }
 
-    // Method to manually trigger emergency stop (for keybind)
-    public static void emergencyStop() {
-        if (enabled) {
-            emergencyStopWithReason("Manual emergency stop triggered");
-        }
-    }
 
     // Method to toggle debug mode (for keybind)
     public static void toggleDebugMode() {
