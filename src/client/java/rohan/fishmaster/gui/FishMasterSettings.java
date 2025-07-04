@@ -234,9 +234,9 @@ public class FishMasterSettings {
     }
 
     public void sendStatusMessage(String feature, boolean enabled) {
-        String status = enabled ? "ENABLED" : "DISABLED";
+        String status = enabled ? "ON" : "OFF";
         Formatting color = enabled ? Formatting.GREEN : Formatting.RED;
-        sendChatMessage("[FishMaster] " + feature + ": " + status, color);
+        sendChatMessage("FM: " + feature + " " + status, color);
     }
 
     // Essential GUI Integration Methods (for future Essential compatibility)
@@ -316,7 +316,7 @@ public class FishMasterSettings {
             seaCreatureKillerEnabled = false;
             SeaCreatureKiller.toggle();
         }
-        sendChatMessage("[FishMaster] EMERGENCY STOP - All features disabled", Formatting.RED);
+        sendChatMessage("FM: EMERGENCY STOP", Formatting.RED);
         saveSettings();
     }
 }

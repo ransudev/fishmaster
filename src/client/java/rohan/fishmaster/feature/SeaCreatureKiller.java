@@ -120,19 +120,17 @@ public class SeaCreatureKiller {
             if (enabled) {
                 if (autoFishEnabled) {
                     // SeaCreatureKiller is enabled and autofish is active - fully functional
-                    client.player.sendMessage(Text.literal("Sea Creature Killer: ").formatted(Formatting.GREEN)
-                        .append(Text.literal("ENABLED").formatted(Formatting.BOLD, Formatting.GREEN))
-                        .append(Text.literal(" (Auto Fishing Mode)").formatted(Formatting.GRAY)), false);
+                    client.player.sendMessage(Text.literal("SCK: ").formatted(Formatting.GREEN)
+                        .append(Text.literal("ON").formatted(Formatting.BOLD, Formatting.GREEN)), false);
                     killCount = 0;
                 } else {
                     // SeaCreatureKiller is enabled but autofish is not active - standby mode
-                    client.player.sendMessage(Text.literal("Sea Creature Killer: ").formatted(Formatting.YELLOW)
-                        .append(Text.literal("ENABLED").formatted(Formatting.BOLD, Formatting.YELLOW))
-                        .append(Text.literal(" (Standby - waiting for Auto Fishing)").formatted(Formatting.GRAY)), false);
+                    client.player.sendMessage(Text.literal("SCK: ").formatted(Formatting.YELLOW)
+                        .append(Text.literal("STANDBY").formatted(Formatting.BOLD, Formatting.YELLOW)), false);
                 }
             } else {
-                client.player.sendMessage(Text.literal("Sea Creature Killer: ").formatted(Formatting.RED)
-                    .append(Text.literal("DISABLED").formatted(Formatting.BOLD, Formatting.RED)), false);
+                client.player.sendMessage(Text.literal("SCK: ").formatted(Formatting.RED)
+                    .append(Text.literal("OFF").formatted(Formatting.BOLD, Formatting.RED)), false);
                 // Reset combat state when disabled
                 targetEntity = null;
                 inCombatMode = false;
@@ -149,14 +147,9 @@ public class SeaCreatureKiller {
             if (active) {
                 // When autofish starts, check if sea creature killer is already enabled
                 if (enabled) {
-                    client.player.sendMessage(Text.literal("Sea Creature Killer: ").formatted(Formatting.GREEN)
-                        .append(Text.literal("ACTIVATED").formatted(Formatting.BOLD, Formatting.GREEN))
-                        .append(Text.literal(" (Auto Fishing started)").formatted(Formatting.GRAY)), false);
+                    client.player.sendMessage(Text.literal("SCK: ").formatted(Formatting.GREEN)
+                        .append(Text.literal("ACTIVE").formatted(Formatting.BOLD, Formatting.GREEN)), false);
                     killCount = 0;
-                } else {
-                    client.player.sendMessage(Text.literal("Sea Creature Killer: ").formatted(Formatting.YELLOW)
-                        .append(Text.literal("Available").formatted(Formatting.BOLD, Formatting.YELLOW))
-                        .append(Text.literal(" (Use toggle key to enable)").formatted(Formatting.GRAY)), false);
                 }
             } else {
                 // When autofish stops, sea creature killer goes into standby mode
@@ -166,9 +159,8 @@ public class SeaCreatureKiller {
                     inCombatMode = false;
                     isTransitioning = false;
 
-                    client.player.sendMessage(Text.literal("Sea Creature Killer: ").formatted(Formatting.YELLOW)
-                        .append(Text.literal("STANDBY").formatted(Formatting.BOLD, Formatting.YELLOW))
-                        .append(Text.literal(" (Auto Fishing stopped)").formatted(Formatting.GRAY)), false);
+                    client.player.sendMessage(Text.literal("SCK: ").formatted(Formatting.YELLOW)
+                        .append(Text.literal("STANDBY").formatted(Formatting.BOLD, Formatting.YELLOW)), false);
                 }
             }
         }
@@ -260,9 +252,9 @@ public class SeaCreatureKiller {
 
         inCombatMode = true;
         if (client.player != null) {
-            client.player.sendMessage(Text.literal("Combat Mode: ").formatted(Formatting.RED)
-                .append(Text.literal("ACTIVATED").formatted(Formatting.BOLD, Formatting.RED))
-                .append(Text.literal(" - Target: " + getEntityDisplayName(targetEntity)).formatted(Formatting.YELLOW)), false);
+            client.player.sendMessage(Text.literal("SCK: ").formatted(Formatting.RED)
+                .append(Text.literal("COMBAT").formatted(Formatting.BOLD, Formatting.RED))
+                .append(Text.literal(" - " + getEntityDisplayName(targetEntity)).formatted(Formatting.YELLOW)), false);
         }
     }
 
@@ -356,8 +348,8 @@ public class SeaCreatureKiller {
         if (!switchToMageWeapon()) {
             // No mage weapon found, send message and return
             if (client.player != null) {
-                client.player.sendMessage(Text.literal("Combat Mode: ").formatted(Formatting.RED)
-                    .append(Text.literal("No mage weapon found!").formatted(Formatting.YELLOW)), false);
+                client.player.sendMessage(Text.literal("SCK: ").formatted(Formatting.RED)
+                    .append(Text.literal("No mage weapon!").formatted(Formatting.YELLOW)), false);
             }
             return;
         }
