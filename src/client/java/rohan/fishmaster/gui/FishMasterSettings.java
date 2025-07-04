@@ -19,8 +19,8 @@ import java.util.Properties;
 public class FishMasterSettings {
 
     private static FishMasterSettings instance;
-    private Properties properties;
-    private File configFile;
+    private final Properties properties;
+    private final File configFile;
 
     // === MAIN FEATURES ===
     public boolean autoFishingEnabled = false;
@@ -73,7 +73,10 @@ public class FishMasterSettings {
         // Create config directory if it doesn't exist
         File configDir = new File("./config/fishmaster/");
         if (!configDir.exists()) {
-            configDir.mkdirs();
+            boolean created = configDir.mkdirs();
+            if (!created) {
+                System.err.println("Failed to create config directory");
+            }
         }
 
         configFile = new File(configDir, "settings.properties");
@@ -212,9 +215,16 @@ public class FishMasterSettings {
             AutoFishingFeature.toggle();
         }
 
-        // Apply sea creature killer setting
+        // Apply sea creature killer setting - but only if autofish is enabled
         if (seaCreatureKillerEnabled != SeaCreatureKiller.isEnabled()) {
-            SeaCreatureKiller.toggle();
+            // Only allow enabling if autofish is enabled
+            if (seaCreatureKillerEnabled && !AutoFishingFeature.isEnabled()) {
+                // Reset the setting if trying to enable without autofish
+                seaCreatureKillerEnabled = false;
+                sendChatMessage("[FishMaster] Sea Creature Killer requires Auto Fishing to be enabled first!", Formatting.RED);
+            } else {
+                SeaCreatureKiller.toggle();
+            }
         }
     }
 
@@ -297,6 +307,12 @@ public class FishMasterSettings {
     }
 
     public void toggleSeaCreatureKiller() {
+        // Check if autofish is enabled before allowing toggle
+        if (!autoFishingEnabled) {
+            sendChatMessage("[FishMaster] Sea Creature Killer requires Auto Fishing to be enabled first!", Formatting.RED);
+            return;
+        }
+
         seaCreatureKillerEnabled = !seaCreatureKillerEnabled;
         SeaCreatureKiller.toggle();
         sendStatusMessage("Sea Creature Killer", seaCreatureKillerEnabled);
@@ -310,7 +326,7 @@ public class FishMasterSettings {
         }
         if (seaCreatureKillerEnabled) {
             seaCreatureKillerEnabled = false;
-            SeaCreatureKiller.toggle();
+            // SeaCreatureKiller will be automatically disabled when autofish stops
         }
         sendChatMessage("[FishMaster] EMERGENCY STOP - All features disabled", Formatting.RED);
         saveSettings();

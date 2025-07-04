@@ -23,7 +23,7 @@ import java.util.HashSet;
 
 public class SeaCreatureKiller {
     private static boolean enabled = false;
-    private static boolean passiveMode = false;
+    private static boolean autoFishEnabled = false; // Track if autofish is enabled
     private static Entity targetEntity = null;
     private static long lastAttackTime = 0;
     private static final long ATTACK_COOLDOWN = 250; // Faster attack rate for combat mode
@@ -107,60 +107,74 @@ public class SeaCreatureKiller {
     }
 
     public static boolean isEnabled() {
-        return enabled;
+        // Only enabled if both the feature is toggled AND autofish is enabled
+        return enabled && autoFishEnabled;
     }
 
     public static void toggle() {
-        if (passiveMode) {
-            // If in passive mode, don't allow manual toggle
+        // Check if autofish is enabled before allowing toggle
+        if (!autoFishEnabled) {
             MinecraftClient client = MinecraftClient.getInstance();
             if (client.player != null) {
-                client.player.sendMessage(Text.literal("Sea Creature Killer is in passive mode (controlled by Auto Fishing)")
-                    .formatted(Formatting.YELLOW), false);
+                client.player.sendMessage(Text.literal("Sea Creature Killer requires Auto Fishing to be enabled first!")
+                    .formatted(Formatting.RED), false);
             }
             return;
         }
 
+        // Toggle the enabled state
         enabled = !enabled;
+
         MinecraftClient client = MinecraftClient.getInstance();
         if (client.player != null) {
             if (enabled) {
                 client.player.sendMessage(Text.literal("Sea Creature Killer: ").formatted(Formatting.GREEN)
-                    .append(Text.literal("ENABLED").formatted(Formatting.BOLD, Formatting.GREEN)), false);
+                    .append(Text.literal("ENABLED").formatted(Formatting.BOLD, Formatting.GREEN))
+                    .append(Text.literal(" (Auto Fishing Mode)").formatted(Formatting.GRAY)), false);
                 killCount = 0;
             } else {
                 client.player.sendMessage(Text.literal("Sea Creature Killer: ").formatted(Formatting.RED)
                     .append(Text.literal("DISABLED").formatted(Formatting.BOLD, Formatting.RED)), false);
+                // Reset combat state when disabled
                 targetEntity = null;
                 inCombatMode = false;
-                isTransitioning = false; // Stop any ongoing transition
+                isTransitioning = false;
             }
         }
     }
 
-    public static void setPassiveMode(boolean active) {
-        passiveMode = active;
-        enabled = active;
+    public static void setAutoFishEnabled(boolean active) {
+        autoFishEnabled = active;
 
-        MinecraftClient client = MinecraftClient.getInstance();
-        if (client.player != null) {
-            if (active) {
-                client.player.sendMessage(Text.literal("Sea Creature Killer: ").formatted(Formatting.AQUA)
-                    .append(Text.literal("PASSIVE MODE ACTIVATED").formatted(Formatting.BOLD, Formatting.AQUA))
-                    .append(Text.literal(" (Auto Fishing)").formatted(Formatting.GRAY)), false);
-                killCount = 0;
-            } else {
-                client.player.sendMessage(Text.literal("Sea Creature Killer: ").formatted(Formatting.GRAY)
-                    .append(Text.literal("PASSIVE MODE DEACTIVATED").formatted(Formatting.BOLD, Formatting.GRAY)), false);
+        if (!active) {
+            // If autofish is disabled, force disable sea creature killer
+            if (enabled) {
+                enabled = false;
                 targetEntity = null;
                 inCombatMode = false;
-                isTransitioning = false; // Stop any ongoing transition
+                isTransitioning = false;
+
+                MinecraftClient client = MinecraftClient.getInstance();
+                if (client.player != null) {
+                    client.player.sendMessage(Text.literal("Sea Creature Killer: ").formatted(Formatting.GRAY)
+                        .append(Text.literal("DISABLED").formatted(Formatting.BOLD, Formatting.GRAY))
+                        .append(Text.literal(" (Auto Fishing stopped)").formatted(Formatting.GRAY)), false);
+                }
+            }
+        } else {
+            // When autofish is enabled, inform user that they can now toggle sea creature killer
+            MinecraftClient client = MinecraftClient.getInstance();
+            if (client.player != null) {
+                client.player.sendMessage(Text.literal("Sea Creature Killer: ").formatted(Formatting.YELLOW)
+                    .append(Text.literal("Available").formatted(Formatting.BOLD, Formatting.YELLOW))
+                    .append(Text.literal(" (Use toggle key to enable)").formatted(Formatting.GRAY)), false);
             }
         }
     }
 
     public static void tick() {
-        if (!enabled) {
+        // Only run if both enabled and autofish is active
+        if (!isEnabled()) {
             return;
         }
 

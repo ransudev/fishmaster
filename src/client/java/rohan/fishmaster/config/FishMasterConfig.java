@@ -35,6 +35,13 @@ public class FishMasterConfig {
             }
 
             String json = Files.readString(CONFIG_PATH);
+
+            // Handle empty or corrupted config files
+            if (json == null || json.trim().isEmpty() || json.trim().equals("{}")) {
+                save();
+                return;
+            }
+
             FishMasterConfig config = GSON.fromJson(json, FishMasterConfig.class);
 
             if (config != null) {
@@ -53,8 +60,9 @@ public class FishMasterConfig {
                 minHealthThreshold = config.minHealthThreshold;
                 pauseOnPlayerMovement = config.pauseOnPlayerMovement;
             }
-        } catch (IOException e) {
-            System.err.println("Failed to load config: " + e.getMessage());
+        } catch (Exception e) {
+            System.err.println("Failed to load config, creating new one: " + e.getMessage());
+            save(); // Create a new config file
         }
     }
 

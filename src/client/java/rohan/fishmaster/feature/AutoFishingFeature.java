@@ -97,7 +97,7 @@ public class AutoFishingFeature {
             // Keep fishing tracker always enabled - don't disable it
             emergencyStop = false;
             // Deactivate sea creature killer when auto fishing stops
-            SeaCreatureKiller.setPassiveMode(false);
+            SeaCreatureKiller.setAutoFishEnabled(false);
         } else {
             if (!performPreStartChecks()) {
                 enabled = false;
@@ -114,8 +114,8 @@ public class AutoFishingFeature {
             consecutiveFailures = 0;
             emergencyStop = false;
             serverConnectionLost = false;
-            // Activate sea creature killer when auto fishing starts
-            SeaCreatureKiller.setPassiveMode(true);
+            // Enable sea creature killer availability when auto fishing starts
+            SeaCreatureKiller.setAutoFishEnabled(true);
         }
 
         MinecraftClient client = MinecraftClient.getInstance();
@@ -440,6 +440,8 @@ public class AutoFishingFeature {
         stop();
         sendFailsafeMessage("EMERGENCY STOP: " + reason, true);
         restoreMouseGrab();
+        // Disable sea creature killer when emergency stop occurs
+        SeaCreatureKiller.setAutoFishEnabled(false);
     }
 
     private static void sendFailsafeMessage(String message, boolean isError) {
@@ -502,14 +504,18 @@ public class AutoFishingFeature {
         stop();
         restoreMouseGrab();
         sendFailsafeMessage("Disconnected from server - auto fishing stopped", false);
+        // Disable sea creature killer when disconnected
+        SeaCreatureKiller.setAutoFishEnabled(false);
     }
 
     public static void onServerSwitch() {
         emergencyStopWithReason("Server change detected");
+        // emergencyStopWithReason already handles disabling sea creature killer
     }
 
     public static void onDimensionChange() {
         emergencyStopWithReason("Dimension change detected");
+        // emergencyStopWithReason already handles disabling sea creature killer
     }
 
     // Method to be called when player takes damage
