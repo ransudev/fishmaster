@@ -61,6 +61,25 @@ public class AutoFishingFeature {
     private static final int BOBBER_SETTLE_DELAY = 40; // 2 seconds in ticks
     private static final int RECAST_DELAY = 10; // 0.5 seconds between recast attempts
 
+    // Fishing timing variables
+    private static long fishingStartTime = 0;
+    private static final long MIN_FISHING_TIME = 2000; // Minimum 2 seconds before checking for fish bites
+
+    // Dynamic recast delay getter
+    private static int getRecastDelay() {
+        return SeaCreatureKiller.isEnabled() ? RECAST_DELAY : 1; // Minimal delay when SCK is disabled
+    }
+
+    // Dynamic bobber settle delay getter
+    private static int getBobberSettleDelay() {
+        return BOBBER_SETTLE_DELAY; // Always use normal delay to ensure bobber lands properly
+    }
+
+    // Dynamic after-fishing delay getter - faster casting after catching fish when SCK is off
+    private static int getAfterFishingDelay() {
+        return SeaCreatureKiller.isEnabled() ? BOBBER_SETTLE_DELAY : 20; // Still faster but allows bobber to land
+    }
+
     // Player movement detection for failsafe
     private static double lastPlayerX = 0;
     private static double lastPlayerY = 0;
@@ -322,7 +341,8 @@ public class AutoFishingFeature {
                 if (client.player.fishHook != null && hasBobberInWater(client.player)) {
                     currentState = FishingState.FISHING;
                     isFishing = true;
-                    sendDebugMessage("Bobber in water - State: CASTING → FISHING");
+                    fishingStartTime = System.currentTimeMillis(); // Record when fishing started
+                    sendDebugMessage("Bobber in water - State: CASTING → FISHING, starting fishing timer");
                 } else {
                     // Handle recast mechanism if bobber is not detected
                     handleRecastMechanism(client);
@@ -334,16 +354,26 @@ public class AutoFishingFeature {
                     sendDebugMessage("Bobber disappeared - resetting state");
                     resetFishingState();
                     delayTimer = 20;
-                } else if (hasBobberInWater(client.player) && detectArmorStandFishBite(client)) {
-                    long currentTimeMillis = System.currentTimeMillis();
-                    if (currentTimeMillis - lastDetectionTime >= DETECTION_COOLDOWN) {
-                        lastDetectionTime = currentTimeMillis;
-                        sendDebugMessage("Fish detected! Reeling in...");
-                        performSingleClick(client);
-                        // After catching a fish, reset to idle state and wait for bobber to settle
-                        resetFishingState();
-                        delayTimer = BOBBER_SETTLE_DELAY; // Wait for bobber to settle before next cast
-                        sendDebugMessage("Fish caught - waiting " + BOBBER_SETTLE_DELAY + " ticks before next cast");
+                } else if (hasBobberInWater(client.player)) {
+                    // Only check for fish bites after minimum fishing time has passed
+                    long timeFishing = System.currentTimeMillis() - fishingStartTime;
+                    if (timeFishing >= MIN_FISHING_TIME && detectArmorStandFishBite(client)) {
+                        long currentTimeMillis = System.currentTimeMillis();
+                        if (currentTimeMillis - lastDetectionTime >= DETECTION_COOLDOWN) {
+                            lastDetectionTime = currentTimeMillis;
+                            sendDebugMessage("Fish detected after " + timeFishing + "ms of fishing! Reeling in...");
+                            performSingleClick(client);
+                            // After catching a fish, reset to idle state and wait for bobber to settle
+                            resetFishingState();
+                            delayTimer = getAfterFishingDelay(); // Use faster delay when SCK is off
+                            sendDebugMessage("Fish caught - waiting " + getAfterFishingDelay() + " ticks before next cast");
+                        }
+                    } else if (timeFishing < MIN_FISHING_TIME) {
+                        // Still waiting for minimum fishing time
+                        long remainingTime = MIN_FISHING_TIME - timeFishing;
+                        if (remainingTime % 1000 == 0) { // Debug message every second
+                            sendDebugMessage("Waiting for fish... " + (remainingTime / 1000) + "s remaining");
+                        }
                     }
                 }
                 break;
@@ -469,12 +499,12 @@ public class AutoFishingFeature {
         currentState = FishingState.CASTING;
         // Use the proper bobber settling mechanism instead of a short delay
         waitingForBobberSettle = true;
-        bobberSettleTimer = BOBBER_SETTLE_DELAY; // 40 ticks = 2 seconds
+        bobberSettleTimer = getBobberSettleDelay(); // Use dynamic delay based on SCK state
         castAttempts = 1; // This is the first attempt
         lastCastTime = System.currentTimeMillis();
         isFishing = false;
 
-        sendDebugMessage("Started casting - State: CASTING, Using bobber settle mechanism: " + BOBBER_SETTLE_DELAY + " ticks");
+        sendDebugMessage("Started casting - State: CASTING, Using bobber settle mechanism: " + getBobberSettleDelay() + " ticks");
     }
 
     private static void resetFishingState() {
@@ -659,7 +689,7 @@ public class AutoFishingFeature {
         }
 
         // Check if enough time has passed since last cast attempt
-        if (currentTime - lastCastTime < RECAST_DELAY * 100) { // Convert to milliseconds
+        if (currentTime - lastCastTime < getRecastDelay() * 100) { // Convert to milliseconds
             return;
         }
 
@@ -677,7 +707,7 @@ public class AutoFishingFeature {
                 Hand hand = client.player.getStackInHand(Hand.MAIN_HAND).getItem() instanceof FishingRodItem ?
                            Hand.MAIN_HAND : Hand.OFF_HAND;
                 client.interactionManager.interactItem(client.player, hand);
-                delayTimer = RECAST_DELAY; // Wait before recasting
+                delayTimer = getRecastDelay(); // Wait before recasting
                 lastCastTime = currentTime;
             } catch (Exception e) {
                 castAttempts++;
@@ -707,7 +737,7 @@ public class AutoFishingFeature {
                 castAttempts++;
                 lastCastTime = currentTime;
                 waitingForBobberSettle = true;
-                bobberSettleTimer = BOBBER_SETTLE_DELAY;
+                bobberSettleTimer = getBobberSettleDelay(); // Use dynamic delay based on SCK state
 
                 if (castAttempts > 1) {
                     sendFailsafeMessage("Recasting bobber (attempt " + castAttempts + "/" + MAX_CAST_ATTEMPTS + ")", false);

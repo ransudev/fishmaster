@@ -116,6 +116,7 @@ public class SeaCreatureKiller {
         return enabled && autoFishEnabled;
     }
 
+
     public static void toggle() {
         // Allow toggling regardless of autofish state
         enabled = !enabled;
