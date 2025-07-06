@@ -67,17 +67,22 @@ public class AutoFishingFeature {
 
     // Dynamic recast delay getter
     private static int getRecastDelay() {
-        return SeaCreatureKiller.isEnabled() ? RECAST_DELAY : 1; // Minimal delay when SCK is disabled
+        int delay = SeaCreatureKiller.isEnabled() ? RECAST_DELAY : 1;
+        sendDebugMessage("Recast delay: " + delay + " ticks (SCK " + (SeaCreatureKiller.isEnabled() ? "enabled" : "disabled") + ")");
+        return delay;
     }
 
     // Dynamic bobber settle delay getter
     private static int getBobberSettleDelay() {
-        return BOBBER_SETTLE_DELAY; // Always use normal delay to ensure bobber lands properly
+        sendDebugMessage("Bobber settle delay: " + BOBBER_SETTLE_DELAY + " ticks");
+        return BOBBER_SETTLE_DELAY;
     }
 
     // Dynamic after-fishing delay getter - faster casting after catching fish when SCK is off
     private static int getAfterFishingDelay() {
-        return SeaCreatureKiller.isEnabled() ? BOBBER_SETTLE_DELAY : 20; // Still faster but allows bobber to land
+        int delay = SeaCreatureKiller.isEnabled() ? BOBBER_SETTLE_DELAY : 20;
+        sendDebugMessage("After-fishing delay: " + delay + " ticks (SCK " + (SeaCreatureKiller.isEnabled() ? "enabled" : "disabled") + ")");
+        return delay;
     }
 
     // Player movement detection for failsafe
@@ -109,7 +114,10 @@ public class AutoFishingFeature {
 
     public static void toggle() {
         enabled = !enabled;
+        sendDebugMessage("Auto fishing toggled: " + (enabled ? "ENABLED" : "DISABLED"));
+
         if (!enabled) {
+            sendDebugMessage("Stopping auto fishing - cleaning up resources");
             stop();
             AutoFishingRenderer.reset();
             restoreMouseGrab();
@@ -117,11 +125,15 @@ public class AutoFishingFeature {
             emergencyStop = false;
             // Deactivate sea creature killer when auto fishing stops
             SeaCreatureKiller.setAutoFishEnabled(false);
+            sendDebugMessage("Auto fishing stopped - SCK disabled, tracker remains active");
         } else {
+            sendDebugMessage("Starting auto fishing - performing pre-start checks");
             if (!performPreStartChecks()) {
                 enabled = false;
+                sendDebugMessage("Pre-start checks failed - auto fishing disabled");
                 return;
             }
+            sendDebugMessage("Pre-start checks passed - initializing systems");
             switchToFishingRod();
             ungrabMouse();
             // Initialize anti-AFK when mod starts
@@ -135,6 +147,7 @@ public class AutoFishingFeature {
             serverConnectionLost = false;
             // Enable sea creature killer availability when auto fishing starts
             SeaCreatureKiller.setAutoFishEnabled(true);
+            sendDebugMessage("Auto fishing started - Session time: " + sessionStartTime + ", SCK enabled, tracker active");
         }
 
         MinecraftClient client = MinecraftClient.getInstance();
@@ -153,24 +166,30 @@ public class AutoFishingFeature {
 
     private static boolean performPreStartChecks() {
         MinecraftClient client = MinecraftClient.getInstance();
+        sendDebugMessage("Starting pre-start checks...");
+
         if (client.player == null || client.world == null) {
+            sendDebugMessage("Pre-start check failed: Player or world is null");
             sendFailsafeMessage("Cannot start: Player or world is null", true);
             return false;
         }
 
         if (FishMasterConfig.isHealthChecksEnabled() &&
             client.player.getHealth() <= FishMasterConfig.getMinHealthThreshold()) {
+            sendDebugMessage("Pre-start check failed: Health too low (" + client.player.getHealth() + " <= " + FishMasterConfig.getMinHealthThreshold() + ")");
             sendFailsafeMessage("Cannot start: Player health too low (≤" +
                 (FishMasterConfig.getMinHealthThreshold() / 2) + " hearts)", true);
             return false;
         }
 
         if (!hasValidFishingRod()) {
+            sendDebugMessage("Pre-start check failed: No valid fishing rod found");
             sendFailsafeMessage("Cannot start: No fishing rod found in inventory", true);
             return false;
         }
 
         if (client.getNetworkHandler() == null) {
+            sendDebugMessage("Pre-start check failed: No network connection");
             sendFailsafeMessage("Cannot start: No network connection", true);
             return false;
         }
@@ -180,6 +199,7 @@ public class AutoFishingFeature {
         lastPlayerY = client.player.getY();
         lastPlayerZ = client.player.getZ();
         playerPositionInitialized = true;
+        sendDebugMessage("Pre-start checks passed - Player position initialized: (" + lastPlayerX + ", " + lastPlayerY + ", " + lastPlayerZ + ")");
 
         return true;
     }
@@ -196,12 +216,16 @@ public class AutoFishingFeature {
             // Use config setting instead of hardcoded value
             antiAfkEnabled = FishMasterConfig.isAntiAfkEnabled();
             movementCount = 0;
+            sendDebugMessage("Anti-AFK initialized - Enabled: " + antiAfkEnabled + ", Original position: Yaw=" + originalYaw + ", Pitch=" + originalPitch);
         }
     }
 
     private static boolean hasValidFishingRod() {
         MinecraftClient client = MinecraftClient.getInstance();
-        if (client.player == null) return false;
+        if (client.player == null) {
+            sendDebugMessage("hasValidFishingRod: Player is null");
+            return false;
+        }
 
         // Check main hand and offhand
         ItemStack mainHand = client.player.getStackInHand(Hand.MAIN_HAND);
@@ -209,18 +233,21 @@ public class AutoFishingFeature {
 
         if ((mainHand.getItem() instanceof FishingRodItem && !mainHand.isEmpty()) ||
             (offHand.getItem() instanceof FishingRodItem && !offHand.isEmpty())) {
+            sendDebugMessage("hasValidFishingRod: Found fishing rod in hands");
             return true;
         }
 
         // Check inventory for fishing rods
+        int rodsFound = 0;
         for (int i = 0; i < client.player.getInventory().size(); i++) {
             ItemStack stack = client.player.getInventory().getStack(i);
             if (stack.getItem() instanceof FishingRodItem && !stack.isEmpty()) {
-                return true;
+                rodsFound++;
             }
         }
 
-        return false;
+        sendDebugMessage("hasValidFishingRod: Found " + rodsFound + " fishing rods in inventory");
+        return rodsFound > 0;
     }
 
     private static void ungrabMouse() {
@@ -228,6 +255,7 @@ public class AutoFishingFeature {
         if (client.mouse != null) {
             mouseWasGrabbed = client.mouse.isCursorLocked();
             client.mouse.unlockCursor();
+            sendDebugMessage("Mouse ungrabbed - Previously grabbed: " + mouseWasGrabbed);
         }
     }
 
@@ -236,6 +264,9 @@ public class AutoFishingFeature {
         if (client.mouse != null) {
             if (mouseWasGrabbed && !enabled) {
                 client.mouse.lockCursor();
+                sendDebugMessage("Mouse grab restored");
+            } else {
+                sendDebugMessage("Mouse grab not restored - Was grabbed: " + mouseWasGrabbed + ", Enabled: " + enabled);
             }
         }
     }
@@ -262,6 +293,7 @@ public class AutoFishingFeature {
 
         MinecraftClient client = MinecraftClient.getInstance();
         if (client.player == null || client.world == null) {
+            sendDebugMessage("Tick: Player or world became null - triggering emergency stop");
             emergencyStopWithReason("Player or world became null");
             return;
         }
@@ -279,6 +311,7 @@ public class AutoFishingFeature {
             );
 
             if (distance > MOVEMENT_THRESHOLD) {
+                sendDebugMessage("Player movement detected - Distance: " + String.format("%.2f", distance) + " blocks (threshold: " + MOVEMENT_THRESHOLD + ")");
                 emergencyStopWithReason("Player moved significantly - possible manual movement or teleport");
                 return;
             }
@@ -287,14 +320,17 @@ public class AutoFishingFeature {
         // Perform periodic health checks
         long currentTime = System.currentTimeMillis();
         if (currentTime - lastHealthCheck >= HEALTH_CHECK_INTERVAL) {
+            sendDebugMessage("Performing periodic health check...");
             if (!performHealthCheck()) {
                 return; // Emergency stop was triggered
             }
             lastHealthCheck = currentTime;
+            sendDebugMessage("Health check passed");
         }
 
         // Check for emergency stop conditions
         if (emergencyStop) {
+            sendDebugMessage("Emergency stop flag detected - stopping");
             stop();
             return;
         }
@@ -309,20 +345,29 @@ public class AutoFishingFeature {
                                offHand.getItem() instanceof FishingRodItem;
 
         if (!hasFishingRod) {
+            sendDebugMessage("No fishing rod in hands - attempting to switch");
             if (!switchToFishingRod()) {
+                sendDebugMessage("Failed to switch to fishing rod - disabling auto fishing");
                 enabled = false;
                 resetFishingState();
                 return;
             }
+            sendDebugMessage("Successfully switched to fishing rod");
         }
 
         if (delayTimer > 0) {
             delayTimer--;
+            if (delayTimer % 20 == 0) { // Debug message every second
+                sendDebugMessage("Delay timer: " + delayTimer + " ticks remaining");
+            }
             return;
         }
 
         if (castCooldownTimer > 0) {
             castCooldownTimer--;
+            if (castCooldownTimer % 20 == 0) { // Debug message every second
+                sendDebugMessage("Cast cooldown timer: " + castCooldownTimer + " ticks remaining");
+            }
         }
 
         switch (currentState) {
@@ -381,6 +426,7 @@ public class AutoFishingFeature {
 
         // Check session time limit
         if (currentTime - sessionStartTime >= FishMasterConfig.getMaxSessionTime()) {
+            sendDebugMessage("Session time limit reached - Runtime: " + (currentTime - sessionStartTime) + "ms, Limit: " + FishMasterConfig.getMaxSessionTime() + "ms");
             emergencyStopWithReason("Maximum session time reached (" +
                 (FishMasterConfig.getMaxSessionTime() / 60000) + " minutes)");
             return;
@@ -388,6 +434,7 @@ public class AutoFishingFeature {
 
         // Check if we haven't caught anything in too long
         if (currentTime - lastSuccessfulFish >= FishMasterConfig.getMaxIdleTime()) {
+            sendDebugMessage("Idle time limit reached - Last fish: " + (currentTime - lastSuccessfulFish) + "ms ago, Limit: " + FishMasterConfig.getMaxIdleTime() + "ms");
             emergencyStopWithReason("No fish caught for " +
                 (FishMasterConfig.getMaxIdleTime() / 60000) + " minutes - possible detection");
             return;
@@ -395,6 +442,7 @@ public class AutoFishingFeature {
 
         // Check consecutive failures
         if (consecutiveFailures >= FishMasterConfig.getMaxConsecutiveFailures()) {
+            sendDebugMessage("Consecutive failure limit reached - Failures: " + consecutiveFailures + ", Limit: " + FishMasterConfig.getMaxConsecutiveFailures());
             emergencyStopWithReason("Too many consecutive fishing failures (" +
                 consecutiveFailures + "/" + FishMasterConfig.getMaxConsecutiveFailures() + ")");
             return;
@@ -406,50 +454,60 @@ public class AutoFishingFeature {
 
         // Skip health checks if disabled in config
         if (!FishMasterConfig.isHealthChecksEnabled()) {
+            sendDebugMessage("Health checks disabled in config - skipping");
             return true;
         }
 
         // Check player health
-        if (client.player.getHealth() <= (FishMasterConfig.getMinHealthThreshold() - 2.0f)) {
-            emergencyStopWithReason("Player health critically low (≤" +
-                ((FishMasterConfig.getMinHealthThreshold() - 2.0f) / 2) + " hearts)");
+        float currentHealth = client.player.getHealth();
+        float threshold = FishMasterConfig.getMinHealthThreshold() - 2.0f;
+        if (currentHealth <= threshold) {
+            sendDebugMessage("Health check failed - Current: " + currentHealth + ", Threshold: " + threshold);
+            emergencyStopWithReason("Player health critically low (≤" + (threshold / 2) + " hearts)");
             return false;
         }
 
-
         // Check if player is in lava
         if (client.player.isInLava()) {
+            sendDebugMessage("Health check failed - Player is in lava");
             emergencyStopWithReason("Player is in lava");
             return false;
         }
 
         // Check if player is on fire
         if (client.player.isOnFire()) {
+            sendDebugMessage("Health check failed - Player is on fire");
             emergencyStopWithReason("Player is on fire");
             return false;
         }
 
         // Check if player is falling from high height
-        if (client.player.getVelocity().y < -0.5 && client.player.getY() > 100) {
+        double velocityY = client.player.getVelocity().y;
+        double playerY = client.player.getY();
+        if (velocityY < -0.5 && playerY > 100) {
+            sendDebugMessage("Health check failed - Player falling from height - Velocity Y: " + velocityY + ", Height: " + playerY);
             emergencyStopWithReason("Player is falling from dangerous height");
             return false;
         }
 
         // Check network connection
         if (client.getNetworkHandler() == null || serverConnectionLost) {
+            sendDebugMessage("Health check failed - Network connection lost");
             emergencyStopWithReason("Lost connection to server");
             return false;
         }
 
         // Check if fishing rod is still available and not broken
         if (!hasValidFishingRod()) {
+            sendDebugMessage("Health check failed - No valid fishing rod available");
             emergencyStopWithReason("No valid fishing rod available");
             return false;
         }
 
         // Check if player moved too far (possible teleportation or admin intervention)
         if (sessionStartTime > 0) {
-            if (client.player.getY() < -64 || client.player.getY() > 320) {
+            if (playerY < -64 || playerY > 320) {
+                sendDebugMessage("Health check failed - Player position out of bounds - Y: " + playerY);
                 emergencyStopWithReason("Player position out of bounds");
                 return false;
             }
@@ -457,14 +515,17 @@ public class AutoFishingFeature {
 
         // Check for suspicious game state changes
         if (client.isPaused()) {
+            sendDebugMessage("Health check failed - Game is paused");
             emergencyStopWithReason("Game is paused");
             return false;
         }
 
+        sendDebugMessage("Health check passed - Health: " + currentHealth + ", Y: " + playerY + ", On fire: " + client.player.isOnFire() + ", In lava: " + client.player.isInLava());
         return true;
     }
 
     private static void emergencyStopWithReason(String reason) {
+        sendDebugMessage("EMERGENCY STOP triggered - Reason: " + reason);
         emergencyStop = true;
         enabled = false;
         stop();
@@ -472,6 +533,7 @@ public class AutoFishingFeature {
         restoreMouseGrab();
         // Disable sea creature killer when emergency stop occurs
         SeaCreatureKiller.setAutoFishEnabled(false);
+        sendDebugMessage("Emergency stop complete - SCK disabled, mouse restored");
     }
 
     // Public method for keybind emergency stop
@@ -489,11 +551,15 @@ public class AutoFishingFeature {
     }
 
     private static void startCasting(MinecraftClient client) {
-        if (client.player == null || client.interactionManager == null) return;
+        if (client.player == null || client.interactionManager == null) {
+            sendDebugMessage("startCasting: Player or interaction manager is null");
+            return;
+        }
 
         Hand hand = client.player.getStackInHand(Hand.MAIN_HAND).getItem() instanceof FishingRodItem ?
                    Hand.MAIN_HAND : Hand.OFF_HAND;
 
+        sendDebugMessage("Starting cast - Hand: " + hand + ", Previous state: " + currentState);
         client.interactionManager.interactItem(client.player, hand);
 
         currentState = FishingState.CASTING;
@@ -504,7 +570,7 @@ public class AutoFishingFeature {
         lastCastTime = System.currentTimeMillis();
         isFishing = false;
 
-        sendDebugMessage("Started casting - State: CASTING, Using bobber settle mechanism: " + getBobberSettleDelay() + " ticks");
+        sendDebugMessage("Cast initiated - State: CASTING, Bobber settle timer: " + bobberSettleTimer + " ticks, Attempt: " + castAttempts);
     }
 
     private static void resetFishingState() {
@@ -513,15 +579,17 @@ public class AutoFishingFeature {
         isFishing = false;
         castCooldownTimer = 0;
         // Reset recast mechanism variables
+        int previousCastAttempts = castAttempts;
         castAttempts = 0;
         waitingForBobberSettle = false;
         bobberSettleTimer = 0;
         lastCastTime = 0;
 
-        sendDebugMessage("Reset fishing state - Previous: " + previousState + ", Current: IDLE");
+        sendDebugMessage("Fishing state reset - Previous: " + previousState + " → Current: IDLE, Previous cast attempts: " + previousCastAttempts);
     }
 
     private static void stop() {
+        sendDebugMessage("Stopping auto fishing - Resetting all timers and states");
         resetFishingState();
         delayTimer = 0;
         lastDetectionTime = 0;
@@ -531,6 +599,7 @@ public class AutoFishingFeature {
         // Reset smooth movement variables
         isMovingToTarget = false;
         smoothSteps = 0;
+        sendDebugMessage("Auto fishing stopped - Anti-AFK disabled, smooth movement reset");
     }
 
     public static void onDisconnect() {
@@ -594,21 +663,28 @@ public class AutoFishingFeature {
 
     private static boolean switchToFishingRod() {
         MinecraftClient client = MinecraftClient.getInstance();
-        if (client.player == null || client.interactionManager == null) return false;
+        if (client.player == null || client.interactionManager == null) {
+            sendDebugMessage("switchToFishingRod: Player or interaction manager is null");
+            return false;
+        }
 
         ItemStack mainHand = client.player.getStackInHand(Hand.MAIN_HAND);
         if (mainHand.getItem() instanceof FishingRodItem) {
+            sendDebugMessage("switchToFishingRod: Already have fishing rod in main hand");
             return true;
         }
 
+        // Check hotbar first
         for (int i = 0; i < 9; i++) {
             ItemStack stack = client.player.getInventory().getStack(i);
             if (stack.getItem() instanceof FishingRodItem) {
                 client.player.getInventory().setSelectedSlot(i);
+                sendDebugMessage("switchToFishingRod: Switched to fishing rod in hotbar slot " + i);
                 return true;
             }
         }
 
+        // Check inventory
         for (int i = 9; i < 36; i++) {
             ItemStack stack = client.player.getInventory().getStack(i);
             if (stack.getItem() instanceof FishingRodItem) {
@@ -622,10 +698,12 @@ public class AutoFishingFeature {
                     client.player
                 );
 
+                sendDebugMessage("switchToFishingRod: Swapped fishing rod from inventory slot " + i + " to hotbar slot " + currentSlot);
                 return true;
             }
         }
 
+        sendDebugMessage("switchToFishingRod: No fishing rod found in inventory");
         return false;
     }
 
@@ -635,7 +713,16 @@ public class AutoFishingFeature {
             return false;
         }
         // Check for both water and lava to support lava fishing on Hypixel Skyblock
-        return bobber.isTouchingWater() || bobber.isInLava();
+        boolean inWater = bobber.isTouchingWater();
+        boolean inLava = bobber.isInLava();
+        boolean result = inWater || inLava;
+
+        if (result) {
+            sendDebugMessage("Bobber status - In water: " + inWater + ", In lava: " + inLava + ", Position: (" +
+                String.format("%.2f", bobber.getX()) + ", " + String.format("%.2f", bobber.getY()) + ", " + String.format("%.2f", bobber.getZ()) + ")");
+        }
+
+        return result;
     }
 
     private static void handleRecastMechanism(MinecraftClient client) {
@@ -777,21 +864,31 @@ public class AutoFishingFeature {
         var entities = client.world.getEntities();
         if (entities == null) return false;
 
+        int armorStandsChecked = 0;
+        int fishBiteStands = 0;
+
         for (Entity entity : entities) {
             if (entity instanceof ArmorStandEntity armorStand) {
+                armorStandsChecked++;
                 if (armorStand.hasCustomName()) {
                     Text customName = armorStand.getCustomName();
                     if (customName != null) {
                         String nameString = customName.getString();
                         if ("!!!".equals(nameString)) {
+                            fishBiteStands++;
                             double distance = armorStand.squaredDistanceTo(client.player);
                             if (distance <= 50 * 50) {
+                                sendDebugMessage("Fish bite detected! Armor stand with '!!!' found at distance: " + String.format("%.2f", Math.sqrt(distance)) + " blocks");
                                 return true;
                             }
                         }
                     }
                 }
             }
+        }
+
+        if (armorStandsChecked > 0) {
+            sendDebugMessage("Fish bite check - Armor stands checked: " + armorStandsChecked + ", Fish bite stands: " + fishBiteStands);
         }
         return false;
     }
