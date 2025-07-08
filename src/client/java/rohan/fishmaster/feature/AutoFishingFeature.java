@@ -345,14 +345,18 @@ public class AutoFishingFeature {
                                offHand.getItem() instanceof FishingRodItem;
 
         if (!hasFishingRod) {
-            sendDebugMessage("No fishing rod in hands - attempting to switch");
-            if (!switchToFishingRod()) {
-                sendDebugMessage("Failed to switch to fishing rod - disabling auto fishing");
+            // Only show error and disable if Sea Creature Killer is not active (to avoid spam during weapon swapping)
+            if (!SeaCreatureKiller.isEnabled()) {
+                sendDebugMessage("No fishing rod in hands - stopping auto fishing");
+                sendFailsafeMessage("Auto fishing stopped: No fishing rod in hands", true);
                 enabled = false;
                 resetFishingState();
-                return;
+            } else {
+                sendDebugMessage("No fishing rod in hands but SCK is active - pausing auto fishing");
+                // Don't disable the macro when SCK is active, just pause fishing logic
+                resetFishingState();
             }
-            sendDebugMessage("Successfully switched to fishing rod");
+            return;
         }
 
         if (delayTimer > 0) {
@@ -668,6 +672,12 @@ public class AutoFishingFeature {
             return false;
         }
 
+        // Don't interfere with SCK weapon swapping during combat
+        if (SeaCreatureKiller.isEnabled()) {
+            sendDebugMessage("switchToFishingRod: SCK is active, skipping weapon swap to avoid interference");
+            return false;
+        }
+
         ItemStack mainHand = client.player.getStackInHand(Hand.MAIN_HAND);
         if (mainHand.getItem() instanceof FishingRodItem) {
             sendDebugMessage("switchToFishingRod: Already have fishing rod in main hand");
@@ -776,7 +786,8 @@ public class AutoFishingFeature {
         }
 
         // Check if enough time has passed since last cast attempt
-        if (currentTime - lastCastTime < getRecastDelay() * 100) { // Convert to milliseconds
+        if (currentTime - lastCastTime < getRecastDelay() * 100) // Convert to milliseconds
+        {
             return;
         }
 

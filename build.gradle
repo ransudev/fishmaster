@@ -53,33 +53,6 @@ dependencies {
 
 	// Fabric API. This is technically optional, but you probably want it anyway.
 	modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
-
-	// Essential dependencies for GUI compatibility (commented out for now)
-	// Uncomment these when you want full Essential integration
-	/*
-	modImplementation("gg.essential:essential-1.21.1-fabric:16451+ga7ef8c2c5") {
-		exclude group: "org.jetbrains.kotlin"
-		exclude group: "org.jetbrains.kotlinx"
-	}
-	
-	// Vigilance for settings GUI (Essential's config library)
-	modImplementation("gg.essential:vigilance-1.21.1-fabric:306") {
-		exclude group: "org.jetbrains.kotlin"
-		exclude group: "org.jetbrains.kotlinx"
-	}
-	
-	// Elementa for GUI components (Essential's GUI library)
-	modImplementation("gg.essential:elementa-1.21.1-fabric:702") {
-		exclude group: "org.jetbrains.kotlin"
-		exclude group: "org.jetbrains.kotlinx"
-	}
-
-	// Optional: UniversalCraft for cross-version compatibility
-	modImplementation("gg.essential:universalcraft-1.21.1-fabric:360") {
-		exclude group: "org.jetbrains.kotlin"
-		exclude group: "org.jetbrains.kotlinx"
-	}
-	*/
 }
 
 processResources {
