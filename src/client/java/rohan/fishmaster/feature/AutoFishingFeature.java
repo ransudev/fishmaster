@@ -90,7 +90,7 @@ public class AutoFishingFeature {
     private static double lastPlayerY = 0;
     private static double lastPlayerZ = 0;
     private static boolean playerPositionInitialized = false;
-    private static final double MOVEMENT_THRESHOLD = 3.0; // Player moved more than 3 blocks
+    private static final double MOVEMENT_THRESHOLD = 10.0; // Player moved more than 10 blocks
 
     private enum FishingState {
         IDLE,
@@ -104,8 +104,8 @@ public class AutoFishingFeature {
     private static final int BOBBER_SETTLE_TIME = 3;
 
     // Anti-AFK constants
-    private static final int ANTI_AFK_INTERVAL = 120; // Move every 6 seconds (120 ticks)
-    private static final float CROSSHAIR_MOVEMENT_RANGE = 2.5f; // Decreased movement range (was 5.0f)
+    private static final int ANTI_AFK_INTERVAL = 200; // Move every 10 seconds (200 ticks)
+    private static final float CROSSHAIR_MOVEMENT_RANGE = 1.8f; // Further decreased movement range for more subtle anti-AFK
 
     static {
         // Initialize fishing events - but don't register keybindings here
@@ -298,24 +298,6 @@ public class AutoFishingFeature {
             return;
         }
 
-        // Check for player movement (possible admin teleport or manual movement)
-        if (FishMasterConfig.isPauseOnPlayerMovementEnabled() && playerPositionInitialized) {
-            double currentX = client.player.getX();
-            double currentY = client.player.getY();
-            double currentZ = client.player.getZ();
-
-            double distance = Math.sqrt(
-                Math.pow(currentX - lastPlayerX, 2) +
-                Math.pow(currentY - lastPlayerY, 2) +
-                Math.pow(currentZ - lastPlayerZ, 2)
-            );
-
-            if (distance > MOVEMENT_THRESHOLD) {
-                sendDebugMessage("Player movement detected - Distance: " + String.format("%.2f", distance) + " blocks (threshold: " + MOVEMENT_THRESHOLD + ")");
-                emergencyStopWithReason("Player moved significantly - possible manual movement or teleport");
-                return;
-            }
-        }
 
         // Perform periodic health checks
         long currentTime = System.currentTimeMillis();
@@ -428,29 +410,7 @@ public class AutoFishingFeature {
                 break;
         }
 
-        // Check session time limit
-        if (currentTime - sessionStartTime >= FishMasterConfig.getMaxSessionTime()) {
-            sendDebugMessage("Session time limit reached - Runtime: " + (currentTime - sessionStartTime) + "ms, Limit: " + FishMasterConfig.getMaxSessionTime() + "ms");
-            emergencyStopWithReason("Maximum session time reached (" +
-                (FishMasterConfig.getMaxSessionTime() / 60000) + " minutes)");
-            return;
-        }
-
-        // Check if we haven't caught anything in too long
-        if (currentTime - lastSuccessfulFish >= FishMasterConfig.getMaxIdleTime()) {
-            sendDebugMessage("Idle time limit reached - Last fish: " + (currentTime - lastSuccessfulFish) + "ms ago, Limit: " + FishMasterConfig.getMaxIdleTime() + "ms");
-            emergencyStopWithReason("No fish caught for " +
-                (FishMasterConfig.getMaxIdleTime() / 60000) + " minutes - possible detection");
-            return;
-        }
-
-        // Check consecutive failures
-        if (consecutiveFailures >= FishMasterConfig.getMaxConsecutiveFailures()) {
-            sendDebugMessage("Consecutive failure limit reached - Failures: " + consecutiveFailures + ", Limit: " + FishMasterConfig.getMaxConsecutiveFailures());
-            emergencyStopWithReason("Too many consecutive fishing failures (" +
-                consecutiveFailures + "/" + FishMasterConfig.getMaxConsecutiveFailures() + ")");
-            return;
-        }
+        // Session management failsafes removed - to be added later per user preference
     }
 
     private static boolean performHealthCheck() {
@@ -471,19 +431,6 @@ public class AutoFishingFeature {
             return false;
         }
 
-        // Check if player is in lava
-        if (client.player.isInLava()) {
-            sendDebugMessage("Health check failed - Player is in lava");
-            emergencyStopWithReason("Player is in lava");
-            return false;
-        }
-
-        // Check if player is on fire
-        if (client.player.isOnFire()) {
-            sendDebugMessage("Health check failed - Player is on fire");
-            emergencyStopWithReason("Player is on fire");
-            return false;
-        }
 
         // Check if player is falling from high height
         double velocityY = client.player.getVelocity().y;
@@ -727,10 +674,6 @@ public class AutoFishingFeature {
         boolean inLava = bobber.isInLava();
         boolean result = inWater || inLava;
 
-        if (result) {
-            sendDebugMessage("Bobber status - In water: " + inWater + ", In lava: " + inLava + ", Position: (" +
-                String.format("%.2f", bobber.getX()) + ", " + String.format("%.2f", bobber.getY()) + ", " + String.format("%.2f", bobber.getZ()) + ")");
-        }
 
         return result;
     }

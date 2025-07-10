@@ -16,6 +16,7 @@ import net.minecraft.util.math.Box;
 import net.minecraft.util.math.Direction;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.util.math.MathHelper;
+import rohan.fishmaster.utils.AngleUtils;
 
 import java.util.List;
 import java.util.Set;
@@ -42,10 +43,10 @@ public class SeaCreatureKiller {
     private static boolean isTransitioningToGround = false;
     private static boolean canAttack = false; // Flag to control when attacking is allowed
 
-    // Weapon switching delay variables - made more realistic
+    // Weapon switching delay variables - optimized for efficiency
     private static long lastWeaponSwitchTime = 0;
-    private static final long WEAPON_SWITCH_DELAY = 1200; // 1.2 seconds between weapon switches
-    private static final long COMBAT_TO_FISHING_DELAY = 2000; // 2 seconds before switching back to fishing rod
+    private static final long WEAPON_SWITCH_DELAY = 400; // Reduced from 1200ms to 400ms for faster weapon switches
+    private static final long COMBAT_TO_FISHING_DELAY = 800; // Reduced from 2000ms to 800ms for faster return to fishing rod
     private static int originalSlot = -1; // Remember original fishing rod slot
     private static boolean needsToSwitchBack = false;
     private static long combatEndTime = 0;
@@ -234,6 +235,82 @@ public class SeaCreatureKiller {
         }
     }
 
+    // Enhanced smooth rotation with proper angle handling
+    private static void updateRotation() {
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (client.player == null) {
+            return;
+        }
+
+        // Calculate the rotation progress
+        long currentTime = System.currentTimeMillis();
+        float progress = MathHelper.clamp((currentTime - transitionStartTime) / (float)TRANSITION_DURATION, 0.0f, 1.0f);
+
+        // Use AngleUtils for smooth rotation interpolation
+        float[] rotationResult = AngleUtils.smoothRotationInterpolation(
+            transitionStartYaw, transitionStartPitch,
+            originalYaw, originalPitch,
+            progress
+        );
+
+        float newYaw = rotationResult[0];
+        float newPitch = rotationResult[1];
+
+        // Update the player's rotation
+        client.player.setYaw(newYaw);
+        client.player.setPitch(newPitch);
+
+        // If transition is complete, stop transitioning
+        if (progress >= 1.0f) {
+            isTransitioning = false;
+            // Ensure final position is exact
+            client.player.setYaw(AngleUtils.normalizeYaw(originalYaw));
+            client.player.setPitch(originalPitch);
+        }
+    }
+
+    private static void updateStartupRotation() {
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (client.player == null) {
+            return;
+        }
+
+        // Calculate the rotation progress
+        long currentTime = System.currentTimeMillis();
+        float progress = MathHelper.clamp((currentTime - transitionStartTime) / (float)TRANSITION_DURATION, 0.0f, 1.0f);
+
+        // Apply smooth easing for natural movement
+        float easedProgress = AngleUtils.easeInOutCubic(progress);
+
+        // Calculate target ground-looking pitch (90 degrees down)
+        float targetPitch = 90.0f;
+
+        // Use shortest rotation path for smooth yaw transition (keep current yaw mostly)
+        float currentYaw = client.player.getYaw();
+        float yawDiff = AngleUtils.getShortestRotationPath(transitionStartYaw, currentYaw);
+
+        // Smoothly interpolate to look at ground
+        float newYaw = transitionStartYaw + (yawDiff * easedProgress * 0.1f); // Minimal yaw adjustment
+        float newPitch = transitionStartPitch + ((targetPitch - transitionStartPitch) * easedProgress);
+
+        // Normalize and clamp angles
+        newYaw = AngleUtils.normalizeYaw(newYaw);
+        newPitch = AngleUtils.clampPitch(newPitch);
+
+        // Update the player's rotation
+        client.player.setYaw(newYaw);
+        client.player.setPitch(newPitch);
+
+        // If transition is complete, stop transitioning and allow attacking
+        if (progress >= 1.0f) {
+            isTransitioningToGround = false;
+            canAttack = true; // Now we can start attacking
+            // Ensure final position is exact
+            client.player.setPitch(90.0f);
+        }
+    }
+
+    // Enhanced transition starter with better angle capture
     private static void startRotationTransition() {
         MinecraftClient client = MinecraftClient.getInstance();
         if (client.player == null) {
@@ -241,8 +318,8 @@ public class SeaCreatureKiller {
         }
 
         // Store the current rotation as the starting point for transition
-        transitionStartYaw = client.player.getYaw();
-        transitionStartPitch = client.player.getPitch();
+        transitionStartYaw = AngleUtils.normalizeYaw(client.player.getYaw());
+        transitionStartPitch = AngleUtils.clampPitch(client.player.getPitch());
 
         // Start the transition
         isTransitioning = true;
@@ -569,70 +646,7 @@ public class SeaCreatureKiller {
         client.player.setPitch(targetPitch);
     }
 
-    // Smooth rotation update using mouse-like movement with easing
-    private static void updateRotation() {
-        MinecraftClient client = MinecraftClient.getInstance();
-        if (client.player == null) {
-            return;
-        }
 
-        // Calculate the rotation progress
-        long currentTime = System.currentTimeMillis();
-        float progress = MathHelper.clamp((currentTime - transitionStartTime) / (float)TRANSITION_DURATION, 0.0f, 1.0f);
-
-        // Apply smooth easing - mimics mouse movement acceleration and deceleration
-        float easedProgress = easeInOutCubic(progress);
-
-        // Smoothly interpolate the yaw and pitch using the eased progress
-        float newYaw = MathHelper.lerp(easedProgress, transitionStartYaw, originalYaw);
-        float newPitch = MathHelper.lerp(easedProgress, transitionStartPitch, originalPitch);
-
-        // Update the player's rotation
-        client.player.setYaw(newYaw);
-        client.player.setPitch(newPitch);
-
-        // If transition is complete, stop transitioning
-        if (progress >= 1.0f) {
-            isTransitioning = false;
-        }
-    }
-
-    private static void updateStartupRotation() {
-        MinecraftClient client = MinecraftClient.getInstance();
-        if (client.player == null) {
-            return;
-        }
-
-        // Calculate the rotation progress
-        long currentTime = System.currentTimeMillis();
-        float progress = MathHelper.clamp((currentTime - transitionStartTime) / (float)TRANSITION_DURATION, 0.0f, 1.0f);
-
-        // Apply smooth easing for natural mouse-like movement
-        float easedProgress = easeInOutCubic(progress);
-
-        // Smoothly interpolate the pitch to look at the ground
-        float newPitch = MathHelper.lerp(easedProgress, transitionStartPitch, 90.0f);
-
-        // Update the player's rotation
-        client.player.setPitch(newPitch);
-
-        // If transition is complete, stop transitioning and allow attacking
-        if (progress >= 1.0f) {
-            isTransitioningToGround = false;
-            canAttack = true; // Now we can start attacking
-        }
-    }
-
-    // Cubic easing function that mimics natural mouse movement
-    // Starts slow, accelerates in the middle, then decelerates at the end
-    private static float easeInOutCubic(float t) {
-        if (t < 0.5f) {
-            return 4.0f * t * t * t;
-        } else {
-            float f = 2.0f * t - 2.0f;
-            return 1.0f + f * f * f / 2.0f;
-        }
-    }
 
     public static int getKillCount() {
         return killCount;
