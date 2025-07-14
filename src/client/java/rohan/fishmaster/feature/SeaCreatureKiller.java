@@ -23,6 +23,8 @@ import java.util.Set;
 import java.util.HashSet;
 
 public class SeaCreatureKiller {
+    private static SeaCreatureKiller instance;
+
     private static boolean enabled = false;
     private static boolean autoFishEnabled = false; // Track if autofish is enabled
     private static Entity targetEntity = null;
@@ -92,9 +94,7 @@ public class SeaCreatureKiller {
         TARGET_CREATURES.add("Great White Shark");
         TARGET_CREATURES.add("Trash Gobbler");
         TARGET_CREATURES.add("Dumpster Diver");
-        TARGET_CREATURES.add("Banshee");
         TARGET_CREATURES.add("Bayou Sludge");
-        TARGET_CREATURES.add("Alligator");
         TARGET_CREATURES.add("Titanoboa");
         TARGET_CREATURES.add("Flaming Worm");
         TARGET_CREATURES.add("Lava Blaze");
@@ -110,6 +110,13 @@ public class SeaCreatureKiller {
         TARGET_CREATURES.add("Thunder");
         TARGET_CREATURES.add("Lord Jawbus");
         TARGET_CREATURES.add("The Loch Emperor");
+        TARGET_CREATURES.add("Alligator");
+        TARGET_CREATURES.add("Banshee");
+        TARGET_CREATURES.add("Blue Ringed Octopus");
+        TARGET_CREATURES.add("Snapping Turtle");
+        TARGET_CREATURES.add("Wiki Tiki");
+        TARGET_CREATURES.add("Frog man");
+        TARGET_CREATURES.add("Bayou Sludgling");
     }
 
     public static boolean isEnabled() {
@@ -670,5 +677,12 @@ public class SeaCreatureKiller {
         originalSlot = -1;
         combatEndTime = 0;
         lastWeaponSwitchTime = 0;
+    }
+
+    public static SeaCreatureKiller getInstance() {
+        if (instance == null) {
+            instance = new SeaCreatureKiller();
+        }
+        return instance;
     }
 }

@@ -6,6 +6,7 @@ import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import rohan.fishmaster.config.FishMasterConfig;
 import rohan.fishmaster.handler.ClientTickHandler;
 import rohan.fishmaster.handler.DisconnectHandler;
+import rohan.fishmaster.handler.WebhookHandler;
 import rohan.fishmaster.config.KeyBindings;
 import rohan.fishmaster.feature.AutoFishingFeature;
 import rohan.fishmaster.command.FishMasterCommand;
@@ -41,6 +42,12 @@ public class FishMasterClient implements ClientModInitializer {
             // Initialize other handlers
             ClientTickHandler.initialize();
             DisconnectHandler.initialize();
+            WebhookHandler.getInstance().initialize();
+
+            // Add shutdown hook for webhook handler
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                WebhookHandler.getInstance().shutdown();
+            }));
 
             // Register the main tick event for auto fishing
             ClientTickEvents.END_CLIENT_TICK.register(client -> {

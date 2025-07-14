@@ -12,6 +12,7 @@ public class FishMasterConfig {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final Path CONFIG_PATH = FabricLoader.getInstance().getConfigDir().resolve("fishmaster").resolve("config.json");
 
+    // Static fields for current values
     private static boolean fishingTrackerEnabled = false;
     private static boolean fishingTrackerSpookyEnabled = false;
     private static boolean fishingTrackerMarinaEnabled = false;
@@ -26,6 +27,14 @@ public class FishMasterConfig {
     private static boolean enableHealthChecks = true;
     private static float minHealthThreshold = 6.0f; // 3 hearts
     private static boolean pauseOnPlayerMovement = true;
+    private static String webhookUrl = "";
+    private static boolean webhookEnabled = false;
+    private static long healthCheckInterval = 300000; // 5 minutes in milliseconds
+
+    // Default constructor for JSON serialization
+    public FishMasterConfig() {
+        // Constructor will be used by GSON for serialization/deserialization
+    }
 
     public static void load() {
         try {
@@ -42,9 +51,10 @@ public class FishMasterConfig {
                 return;
             }
 
-            FishMasterConfig config = GSON.fromJson(json, FishMasterConfig.class);
+            ConfigData config = GSON.fromJson(json, ConfigData.class);
 
             if (config != null) {
+                // Load values from config object to static fields
                 fishingTrackerEnabled = config.fishingTrackerEnabled;
                 fishingTrackerSpookyEnabled = config.fishingTrackerSpookyEnabled;
                 fishingTrackerMarinaEnabled = config.fishingTrackerMarinaEnabled;
@@ -59,7 +69,11 @@ public class FishMasterConfig {
                 enableHealthChecks = config.enableHealthChecks;
                 minHealthThreshold = config.minHealthThreshold;
                 pauseOnPlayerMovement = config.pauseOnPlayerMovement;
+                webhookUrl = config.webhookUrl != null ? config.webhookUrl : "";
+                webhookEnabled = config.webhookEnabled;
+                healthCheckInterval = config.healthCheckInterval > 0 ? config.healthCheckInterval : 300000;
             }
+            System.out.println("[FishMaster] Config loaded successfully. Webhook URL: " + (webhookUrl.isEmpty() ? "Not set" : "Set"));
         } catch (Exception e) {
             System.err.println("Failed to load config, creating new one: " + e.getMessage());
             save(); // Create a new config file
@@ -71,11 +85,54 @@ public class FishMasterConfig {
             if (!Files.exists(CONFIG_PATH.getParent())) {
                 Files.createDirectories(CONFIG_PATH.getParent());
             }
-            String json = GSON.toJson(new FishMasterConfig());
+
+            // Create a config object with current values for serialization
+            ConfigData configData = new ConfigData();
+            configData.fishingTrackerEnabled = fishingTrackerEnabled;
+            configData.fishingTrackerSpookyEnabled = fishingTrackerSpookyEnabled;
+            configData.fishingTrackerMarinaEnabled = fishingTrackerMarinaEnabled;
+            configData.fishingTrackerWinterEnabled = fishingTrackerWinterEnabled;
+            configData.fishingTrackerTimeSinceEnabled = fishingTrackerTimeSinceEnabled;
+            configData.autoDetectFishingTypeEnabled = autoDetectFishingTypeEnabled;
+            configData.fishingTrackerType = fishingTrackerType;
+            configData.antiAfkEnabled = antiAfkEnabled;
+            configData.maxSessionTime = maxSessionTime;
+            configData.maxIdleTime = maxIdleTime;
+            configData.maxConsecutiveFailures = maxConsecutiveFailures;
+            configData.enableHealthChecks = enableHealthChecks;
+            configData.minHealthThreshold = minHealthThreshold;
+            configData.pauseOnPlayerMovement = pauseOnPlayerMovement;
+            configData.webhookUrl = webhookUrl;
+            configData.webhookEnabled = webhookEnabled;
+            configData.healthCheckInterval = healthCheckInterval;
+
+            String json = GSON.toJson(configData);
             Files.writeString(CONFIG_PATH, json);
+            System.out.println("[FishMaster] Config saved to: " + CONFIG_PATH);
         } catch (IOException e) {
             System.err.println("Failed to save config: " + e.getMessage());
         }
+    }
+
+    // Inner class for JSON serialization
+    private static class ConfigData {
+        public boolean fishingTrackerEnabled;
+        public boolean fishingTrackerSpookyEnabled;
+        public boolean fishingTrackerMarinaEnabled;
+        public boolean fishingTrackerWinterEnabled;
+        public boolean fishingTrackerTimeSinceEnabled;
+        public boolean autoDetectFishingTypeEnabled;
+        public int fishingTrackerType;
+        public boolean antiAfkEnabled;
+        public long maxSessionTime;
+        public long maxIdleTime;
+        public int maxConsecutiveFailures;
+        public boolean enableHealthChecks;
+        public float minHealthThreshold;
+        public boolean pauseOnPlayerMovement;
+        public String webhookUrl;
+        public boolean webhookEnabled;
+        public long healthCheckInterval;
     }
 
     // Getters
@@ -135,6 +192,18 @@ public class FishMasterConfig {
         return pauseOnPlayerMovement;
     }
 
+    public static String getWebhookUrl() {
+        return webhookUrl;
+    }
+
+    public static boolean isWebhookEnabled() {
+        return webhookEnabled;
+    }
+
+    public static long getHealthCheckInterval() {
+        return healthCheckInterval;
+    }
+
     // Setters
     public static void setFishingTrackerEnabled(boolean enabled) {
         fishingTrackerEnabled = enabled;
@@ -167,10 +236,8 @@ public class FishMasterConfig {
     }
 
     public static void setFishingTrackerType(int type) {
-        if (type >= 0 && type <= 2) {
-            fishingTrackerType = type;
-            save();
-        }
+        fishingTrackerType = type;
+        save();
     }
 
     public static void setAntiAfkEnabled(boolean enabled) {
@@ -179,24 +246,18 @@ public class FishMasterConfig {
     }
 
     public static void setMaxSessionTime(long time) {
-        if (time > 0 && time <= 7200000) { // Max 2 hours
-            maxSessionTime = time;
-            save();
-        }
+        maxSessionTime = time;
+        save();
     }
 
     public static void setMaxIdleTime(long time) {
-        if (time > 0 && time <= 1800000) { // Max 30 minutes
-            maxIdleTime = time;
-            save();
-        }
+        maxIdleTime = time;
+        save();
     }
 
     public static void setMaxConsecutiveFailures(int failures) {
-        if (failures > 0 && failures <= 50) {
-            maxConsecutiveFailures = failures;
-            save();
-        }
+        maxConsecutiveFailures = failures;
+        save();
     }
 
     public static void setHealthChecksEnabled(boolean enabled) {
@@ -205,14 +266,29 @@ public class FishMasterConfig {
     }
 
     public static void setMinHealthThreshold(float threshold) {
-        if (threshold >= 2.0f && threshold <= 20.0f) {
-            minHealthThreshold = threshold;
-            save();
-        }
+        minHealthThreshold = threshold;
+        save();
     }
 
     public static void setPauseOnPlayerMovementEnabled(boolean enabled) {
         pauseOnPlayerMovement = enabled;
+        save();
+    }
+
+    public static void setWebhookUrl(String url) {
+        webhookUrl = url != null ? url : "";
+        save();
+        System.out.println("[FishMaster] Webhook URL " + (webhookUrl.isEmpty() ? "cleared" : "set"));
+    }
+
+    public static void setWebhookEnabled(boolean enabled) {
+        webhookEnabled = enabled;
+        save();
+        System.out.println("[FishMaster] Webhook " + (enabled ? "enabled" : "disabled"));
+    }
+
+    public static void setHealthCheckInterval(long interval) {
+        healthCheckInterval = Math.max(60000, interval); // Minimum 1 minute
         save();
     }
 

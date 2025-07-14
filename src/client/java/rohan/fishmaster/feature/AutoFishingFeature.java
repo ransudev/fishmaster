@@ -14,6 +14,8 @@ import rohan.fishmaster.render.AutoFishingRenderer;
 import rohan.fishmaster.config.FishMasterConfig;
 
 public class AutoFishingFeature {
+    private static AutoFishingFeature instance;
+
     private static boolean enabled = false;
     private static boolean isFishing = false;
     private static int delayTimer = 0;
@@ -24,23 +26,11 @@ public class AutoFishingFeature {
     // Debug mode variables
     private static boolean debugMode = false;
 
-    // Anti-AFK variables
+    // Anti-AFK variables (without rotations)
     private static boolean antiAfkEnabled = true; // Passive when mod starts
     private static int antiAfkTimer = 0;
-    private static float lastYaw = 0.0f;
-    private static float lastPitch = 0.0f;
-    private static float targetYaw = 0.0f;
-    private static float targetPitch = 0.0f;
-    private static boolean isMovingToTarget = false;
-    private static int smoothSteps = 0;
-    private static final int SMOOTH_DURATION = 20; // Smooth over 20 ticks (1 second)
+    private static long lastAntiAfkAction = 0;
     private static final java.util.Random random = new java.util.Random();
-
-    // Original position tracking for anti-AFK
-    private static float originalYaw = 0.0f;
-    private static float originalPitch = 0.0f;
-    private static int movementCount = 0;
-    private static final int RETURN_TO_ORIGIN_INTERVAL = 5; // Return to original position every 5 movements
 
     // Failsafe variables
     private static long lastSuccessfulFish = System.currentTimeMillis();
@@ -207,16 +197,11 @@ public class AutoFishingFeature {
     private static void initializeAntiAfk() {
         MinecraftClient client = MinecraftClient.getInstance();
         if (client.player != null) {
-            lastYaw = client.player.getYaw();
-            lastPitch = client.player.getPitch();
             // Store original position
-            originalYaw = lastYaw;
-            originalPitch = lastPitch;
-            antiAfkTimer = 0;
-            // Use config setting instead of hardcoded value
             antiAfkEnabled = FishMasterConfig.isAntiAfkEnabled();
-            movementCount = 0;
-            sendDebugMessage("Anti-AFK initialized - Enabled: " + antiAfkEnabled + ", Original position: Yaw=" + originalYaw + ", Pitch=" + originalPitch);
+            antiAfkTimer = 0;
+            lastAntiAfkAction = System.currentTimeMillis();
+            sendDebugMessage("Anti-AFK initialized - Enabled: " + antiAfkEnabled);
         }
     }
 
@@ -547,10 +532,7 @@ public class AutoFishingFeature {
         // Disable anti-AFK when stopping
         antiAfkEnabled = false;
         antiAfkTimer = 0;
-        // Reset smooth movement variables
-        isMovingToTarget = false;
-        smoothSteps = 0;
-        sendDebugMessage("Auto fishing stopped - Anti-AFK disabled, smooth movement reset");
+        sendDebugMessage("Auto fishing stopped - Anti-AFK disabled");
     }
 
     public static void onDisconnect() {
@@ -850,84 +832,29 @@ public class AutoFishingFeature {
     private static void handleAntiAfk(MinecraftClient client) {
         if (!antiAfkEnabled || client.player == null) return;
 
-        // Handle smooth movement to target position
-        if (isMovingToTarget) {
-            smoothSteps++;
-            float progress = (float) smoothSteps / SMOOTH_DURATION;
-
-            if (progress >= 1.0f) {
-                // Movement complete
-                client.player.setYaw(targetYaw);
-                client.player.setPitch(targetPitch);
-                lastYaw = targetYaw;
-                lastPitch = targetPitch;
-                isMovingToTarget = false;
-                smoothSteps = 0;
-
-                // Increment movement count after completing a movement
-                movementCount++;
-            } else {
-                // Smooth interpolation using easing function
-                float easedProgress = easeInOutSine(progress);
-                float currentYaw = lerp(lastYaw, targetYaw, easedProgress);
-                float currentPitch = lerp(lastPitch, targetPitch, easedProgress);
-
-                client.player.setYaw(currentYaw);
-                client.player.setPitch(currentPitch);
-            }
-            return;
-        }
-
         antiAfkTimer++;
 
         if (antiAfkTimer >= ANTI_AFK_INTERVAL) {
             antiAfkTimer = 0;
 
-            // Check if it's time to return to original position
-            if (movementCount >= RETURN_TO_ORIGIN_INTERVAL) {
-                movementCount = 0;
-                targetYaw = originalYaw;
-                targetPitch = originalPitch;
-            } else {
-                // Generate random movement near original position
-                float maxDistanceFromOrigin = CROSSHAIR_MOVEMENT_RANGE * 1.5f;
-
-                // Calculate random offset but keep it within range of original position
-                float yawOffset = random.nextFloat() * CROSSHAIR_MOVEMENT_RANGE * 2 - CROSSHAIR_MOVEMENT_RANGE;
-                float pitchOffset = random.nextFloat() * (CROSSHAIR_MOVEMENT_RANGE * 1.2f) - (CROSSHAIR_MOVEMENT_RANGE * 0.6f);
-
-                // Calculate potential new position
-                float potentialYaw = originalYaw + yawOffset;
-                float potentialPitch = originalPitch + pitchOffset;
-
-                // Clamp to stay near original position
-                float yawDistanceFromOrigin = Math.abs(potentialYaw - originalYaw);
-                float pitchDistanceFromOrigin = Math.abs(potentialPitch - originalPitch);
-
-                if (yawDistanceFromOrigin > maxDistanceFromOrigin) {
-                    yawOffset = yawOffset > 0 ? maxDistanceFromOrigin : -maxDistanceFromOrigin;
+            // Perform a random movement action to simulate player activity
+            try {
+                // Randomly choose between a small left/right movement
+                if (random.nextBoolean()) {
+                    client.player.setYaw(client.player.getYaw() + CROSSHAIR_MOVEMENT_RANGE);
+                } else {
+                    client.player.setYaw(client.player.getYaw() - CROSSHAIR_MOVEMENT_RANGE);
                 }
-                if (pitchDistanceFromOrigin > maxDistanceFromOrigin) {
-                    pitchOffset = pitchOffset > 0 ? maxDistanceFromOrigin : -maxDistanceFromOrigin;
-                }
-
-                targetYaw = originalYaw + yawOffset;
-                targetPitch = Math.max(-90.0f, Math.min(90.0f, originalPitch + pitchOffset));
+            } catch (Exception e) {
+                sendDebugMessage("Error performing anti-AFK movement: " + e.getMessage());
             }
-
-            // Start smooth movement
-            isMovingToTarget = true;
-            smoothSteps = 0;
         }
     }
 
-    // Linear interpolation function
-    private static float lerp(float start, float end, float progress) {
-        return start + (end - start) * progress;
-    }
-
-    // Smooth easing function for natural movement
-    private static float easeInOutSine(float x) {
-        return (float) (-(Math.cos(Math.PI * x) - 1) / 2);
+    public static AutoFishingFeature getInstance() {
+        if (instance == null) {
+            instance = new AutoFishingFeature();
+        }
+        return instance;
     }
 }
