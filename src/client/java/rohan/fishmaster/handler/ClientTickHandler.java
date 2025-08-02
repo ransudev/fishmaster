@@ -27,5 +27,8 @@ public class ClientTickHandler {
         if (KeyBindings.TOGGLE_SEA_CREATURE_KILLER.wasPressed()) {
             SeaCreatureKiller.toggle();
         }
+
+        // Tick all features
+        SeaCreatureKiller.tick();
     }
 }

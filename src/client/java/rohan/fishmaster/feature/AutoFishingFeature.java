@@ -144,11 +144,11 @@ public class AutoFishingFeature {
         if (client.player != null) {
             if (enabled) {
                 Text prefix = Text.literal("[Fish Master] ").formatted(Formatting.AQUA, Formatting.BOLD);
-                Text message = Text.literal("Auto fishing enabled (mouse ungrabbed, anti-AFK active, tracker always on)").formatted(Formatting.GREEN);
+                Text message = Text.literal("Auto fishing enabled").formatted(Formatting.GREEN);
                 client.player.sendMessage(prefix.copy().append(message), false);
             } else {
                 Text prefix = Text.literal("[Fish Master] ").formatted(Formatting.AQUA, Formatting.BOLD);
-                Text message = Text.literal("Auto fishing disabled (mouse restored, anti-AFK disabled, tracker remains on)").formatted(Formatting.RED);
+                Text message = Text.literal("Auto fishing disabled").formatted(Formatting.RED);
                 client.player.sendMessage(prefix.copy().append(message), false);
             }
         }

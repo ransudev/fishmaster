@@ -30,7 +30,7 @@ public class SeaCreatureKiller {
     private static Entity targetEntity = null;
     private static long lastAttackTime = 0;
     private static final long ATTACK_COOLDOWN = 250; // Faster attack rate for combat mode
-    private static final double DETECTION_RANGE = 7.0; // 7 block range as requested
+    private static final double DETECTION_RANGE = 6.0;
     private static int killCount = 0;
     private static boolean inCombatMode = false;
 
@@ -39,7 +39,7 @@ public class SeaCreatureKiller {
     private static float originalPitch = 0.0f;
     private static boolean isTransitioning = false;
     private static long transitionStartTime = 0;
-    private static final long TRANSITION_DURATION = 300; // Reduced from 800ms to 300ms for faster transitions
+    private static final long TRANSITION_DURATION = 350; // Reduced from 800ms to 300ms for faster transitions
     private static float transitionStartYaw = 0.0f;
     private static float transitionStartPitch = 0.0f;
     private static boolean isTransitioningToGround = false;
@@ -48,7 +48,7 @@ public class SeaCreatureKiller {
     // Weapon switching delay variables - optimized for efficiency
     private static long lastWeaponSwitchTime = 0;
     private static final long WEAPON_SWITCH_DELAY = 400; // Reduced from 1200ms to 400ms for faster weapon switches
-    private static final long COMBAT_TO_FISHING_DELAY = 800; // Reduced from 2000ms to 800ms for faster return to fishing rod
+    private static final long COMBAT_TO_FISHING_DELAY = 200; // Reduced from 2000ms to 800ms for faster return to fishing rod
     private static int originalSlot = -1; // Remember original fishing rod slot
     private static boolean needsToSwitchBack = false;
     private static long combatEndTime = 0;
@@ -123,6 +123,7 @@ public class SeaCreatureKiller {
         // Only enabled if both the feature is toggled AND autofish is enabled
         return enabled && autoFishEnabled;
     }
+
 
 
     public static void toggle() {
