@@ -1,22 +1,33 @@
 plugins {
 	id 'fabric-loom' version '1.10.5'
 	id 'maven-publish'
+	id 'org.jetbrains.kotlin.jvm' version '2.0.21'
 }
 
+version = project.mod_version
 group = project.maven_group
 
 base {
 	archivesName = project.archives_base_name
 }
 
+// Define versions for Elementa and UniversalCraft
+def elementaVersion = "589"  // Latest stable version
+def ucVersion = "598"        // Latest stable version
+
 repositories {
 	// These are the repositories where the dependencies are published
-	mavenCentral()
 	maven {
 		name = 'Fabric'
 		url = 'https://maven.fabricmc.net/'
 	}
-	// Essential Maven Repository for GUI compatibility
+	// This repository hosts the snapshot/dev builds of Fabric API
+	maven {
+		name = 'Fabric Snapshots'
+		url = 'https://maven.fabricmc.net/develop/'
+	}
+	mavenCentral()
+	// Essential Maven Repository for Elementa GUI library
 	maven {
 		name = "Essential"
 		url = "https://repo.essential.gg/repository/maven-public/"
@@ -30,6 +41,10 @@ repositories {
 	maven {
 		name = 'JitPack'
 		url = 'https://jitpack.io'
+	}
+	// Local libs folder for custom dependencies
+	flatDir {
+		dirs 'libs'
 	}
 }
 
@@ -50,8 +65,29 @@ dependencies {
 	mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
 	modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
 
-	// Fabric API. This is technically optional, but you probably want it anyway.
-	modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
+	// Fabric API - using specific version
+	modImplementation "net.fabricmc.fabric-api:fabric-api:0.120.0+1.21.5"
+
+	// Kotlin support with specific version
+	modImplementation "net.fabricmc:fabric-language-kotlin:1.13.2+kotlin.2.1.20"
+	implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8:2.1.20"
+	implementation "org.jetbrains.kotlin:kotlin-reflect:2.1.20"
+
+	// Kotlin coroutines (useful for async operations)
+	implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3"
+	implementation "org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.7.3"
+
+	// Elementa GUI library from local libs folder - embedded in the final JAR
+	implementation(include(files("libs/elementa-710.jar")))
+
+	// UniversalCraft from local libs folder - embedded in the final JAR
+	modImplementation(include(files("libs/universalcraft-1.21.5-fabric-419.jar")))
+
+	// Mark all Kotlin stdlib dependencies as provided to avoid conflicts
+	modCompileOnly "org.jetbrains.kotlin:kotlin-stdlib:2.1.20"
+	modCompileOnly "org.jetbrains.kotlin:kotlin-stdlib-common:2.1.20"
+	modCompileOnly "org.jetbrains.kotlin:kotlin-stdlib-jdk8:2.1.20"
+	modCompileOnly "org.jetbrains.kotlin:kotlin-stdlib-jdk7:2.1.20"
 }
 
 processResources {
@@ -77,6 +113,17 @@ tasks.withType(JavaCompile).configureEach {
 	if (targetJavaVersion >= 10 || JavaVersion.current().isJava10Compatible()) {
 		it.options.release = targetJavaVersion
 	}
+}
+
+// Kotlin compilation settings
+tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
+    kotlinOptions {
+        jvmTarget = "21"
+        freeCompilerArgs += [
+            "-Xjsr305=strict",
+            "-Xopt-in=kotlin.RequiresOptIn"
+        ]
+    }
 }
 
 java {
@@ -105,7 +152,6 @@ publishing {
 		}
 	}
 
-	// See https://docs.gradle.org/current/userguide/publishing_maven.html for information on how to set up publishing.
 	repositories {
 		// Add repositories to publish to here.
 		// Notice: This block does NOT have the same function as the block in the top level.

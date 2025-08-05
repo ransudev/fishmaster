@@ -1,37 +1,49 @@
 {
-	"schemaVersion": 1,
-	"id": "fishmaster",
-	"version": "1.0.0",
-	"name": "FishMaster",
-	"description": "Fishing Module for Hypixel Skyblock",
-	"authors": [
-		"Me!"
-	],
-	"contact": {
-		"homepage": "https://fabricmc.net/",
-		"sources": "https://github.com/FabricMC/fabric-example-mod"
-	},
-	"license": "CC0-1.0",
-	"icon": "assets/fishmaster/icon.png",
-	"environment": "client",
-	"entrypoints": {
-		"client": [
-			"rohan.fishmaster.FishMasterClient"
-		]
-	},
-	"mixins": [
-		{
-			"config": "fishmaster.client.mixins.json",
-			"environment": "client"
-		}
-	],
-	"depends": {
-		"fabricloader": ">=0.16.14",
-		"minecraft": "~1.21.5",
-		"java": ">=21",
-		"fabric-api": "*"
-	},
-	"suggests": {
-		"another-mod": "*"
-	}
+  "schemaVersion": 1,
+  "id": "fishmaster",
+  "version": "1.0.0",
+  "name": "Fish Master",
+  "description": "Advanced auto fishing and sea creature killer for Hypixel Skyblock",
+  "authors": [
+    "Rohan"
+  ],
+  "contact": {
+    "homepage": "",
+    "sources": ""
+  },
+  "license": "MIT",
+  "icon": "assets/fishmaster/icon.png",
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      {
+        "adapter": "kotlin",
+        "value": "rohan.fishmaster.FishMasterClient"
+      }
+    ]
+  },
+  "mixins": [
+    "fishmaster.client.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.16.10",
+    "fabric": "*",
+    "fabric-language-kotlin": ">=1.10.0",
+    "minecraft": "1.21.5",
+    "java": ">=21"
+  },
+  "suggests": {
+    "another-mod": "*"
+  },
+  "custom": {
+    "modmenu": {
+      "badges": ["client"],
+      "parent": {
+        "id": "fishmaster",
+        "name": "Fish Master",
+        "badges": ["client"]
+      }
+    }
+  }
 }
+

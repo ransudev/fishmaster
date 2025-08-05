@@ -30,6 +30,7 @@ public class FishMasterConfig {
     private static String webhookUrl = "";
     private static boolean webhookEnabled = false;
     private static long healthCheckInterval = 300000; // 5 minutes in milliseconds
+    private static String customMageWeapon = ""; // Custom mage weapon name for SCK
 
     // Default constructor for JSON serialization
     public FishMasterConfig() {
@@ -72,6 +73,7 @@ public class FishMasterConfig {
                 webhookUrl = config.webhookUrl != null ? config.webhookUrl : "";
                 webhookEnabled = config.webhookEnabled;
                 healthCheckInterval = config.healthCheckInterval > 0 ? config.healthCheckInterval : 300000;
+                customMageWeapon = config.customMageWeapon != null ? config.customMageWeapon : "";
             }
             System.out.println("[FishMaster] Config loaded successfully. Webhook URL: " + (webhookUrl.isEmpty() ? "Not set" : "Set"));
         } catch (Exception e) {
@@ -105,6 +107,7 @@ public class FishMasterConfig {
             configData.webhookUrl = webhookUrl;
             configData.webhookEnabled = webhookEnabled;
             configData.healthCheckInterval = healthCheckInterval;
+            configData.customMageWeapon = customMageWeapon;
 
             String json = GSON.toJson(configData);
             Files.writeString(CONFIG_PATH, json);
@@ -133,6 +136,7 @@ public class FishMasterConfig {
         public String webhookUrl;
         public boolean webhookEnabled;
         public long healthCheckInterval;
+        public String customMageWeapon;
     }
 
     // Getters
@@ -202,6 +206,10 @@ public class FishMasterConfig {
 
     public static long getHealthCheckInterval() {
         return healthCheckInterval;
+    }
+
+    public static String getCustomMageWeapon() {
+        return customMageWeapon;
     }
 
     // Setters
@@ -290,6 +298,12 @@ public class FishMasterConfig {
     public static void setHealthCheckInterval(long interval) {
         healthCheckInterval = Math.max(60000, interval); // Minimum 1 minute
         save();
+    }
+
+    public static void setCustomMageWeapon(String weapon) {
+        customMageWeapon = weapon != null ? weapon : "";
+        save();
+        System.out.println("[FishMaster] Custom mage weapon " + (customMageWeapon.isEmpty() ? "cleared" : "set to " + customMageWeapon));
     }
 
     public static void toggleFishingTracker() {

@@ -576,41 +576,16 @@ public class SeaCreatureKiller {
             return false;
         }
 
-        String itemName = stack.getItem().toString().toLowerCase();
         String displayName = stack.getName().getString().toLowerCase();
-
-        // Check for common mage weapon patterns
-        return itemName.contains("staff") ||
-               itemName.contains("wand") ||
-               itemName.contains("orb") ||
-               itemName.contains("rod") && !itemName.contains("fishing") || // Rod but not fishing rod
-               displayName.contains("staff") ||
-               displayName.contains("wand") ||
-               displayName.contains("orb") ||
-               displayName.contains("mage") ||
-               displayName.contains("magic") ||
-               displayName.contains("spirit") ||
-               displayName.contains("yeti") ||
-               displayName.contains("sword") && (displayName.contains("mage") || displayName.contains("magic")) ||
-               // Hypixel Skyblock specific mage weapons
-               displayName.contains("bonzo") ||
-               displayName.contains("frozen scythe") ||
-               displayName.contains("wither") && displayName.contains("shield") ||
-               displayName.contains("jerry") ||
-               displayName.contains("midas") ||
-               displayName.contains("scorpion") ||
-               displayName.contains("fire") && displayName.contains("rod") ||
-               displayName.contains("ice") && displayName.contains("rod") ||
-               displayName.contains("thunder") && displayName.contains("rod") ||
-               // New specific mage weapons
-               displayName.contains("scylla") ||
-               displayName.contains("valkyrie") ||
-               displayName.contains("astrea") ||
-               displayName.contains("midas's staff") ||
-               displayName.contains("midas staff") ||
-               displayName.contains("fire veil wand") ||
-               displayName.contains("fire veil") ||
-               displayName.contains("hyperion");
+        String customWeapon = rohan.fishmaster.config.FishMasterConfig.getCustomMageWeapon().toLowerCase();
+        
+        // If no custom mage weapon is set, return false (no mage weapon detection)
+        if (customWeapon.isEmpty()) {
+            return false;
+        }
+        
+        // Check if the item matches the custom mage weapon
+        return displayName.contains(customWeapon);
     }
 
     private static boolean isFishingRod(ItemStack stack) {

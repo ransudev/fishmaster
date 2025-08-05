@@ -7,6 +7,7 @@ import com.mojang.brigadier.context.CommandContext;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandManager;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.item.ItemStack;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import rohan.fishmaster.config.FishMasterConfig;
@@ -17,11 +18,16 @@ import rohan.fishmaster.handler.WebhookHandler;
 public class FishMasterCommand {
 
     public static void register(CommandDispatcher<FabricClientCommandSource> dispatcher) {
+        // Register main commands with specific priorities
         dispatcher.register(ClientCommandManager.literal("fm")
-            .executes(FishMasterCommand::showStatus));
+            .executes(FishMasterCommand::openSettingsScreen));
 
         dispatcher.register(ClientCommandManager.literal("fishmaster")
-            .executes(FishMasterCommand::showStatus));
+            .executes(FishMasterCommand::openSettingsScreen));
+
+        // Additional command for explicitly opening the GUI
+        dispatcher.register(ClientCommandManager.literal("fmgui")
+            .executes(FishMasterCommand::openSettingsScreen));
 
         // Register webhook commands
         dispatcher.register(ClientCommandManager.literal("fmwh")
@@ -40,8 +46,61 @@ public class FishMasterCommand {
             .then(ClientCommandManager.literal("clear")
                 .executes(FishMasterCommand::clearWebhook))
             .executes(FishMasterCommand::showWebhookStatus));
+
+        // Register setmageweapon command
+        dispatcher.register(ClientCommandManager.literal("setmageweapon")
+            .executes(FishMasterCommand::setMageWeapon));
+
+        // Register clearmageweapon command for convenience
+        dispatcher.register(ClientCommandManager.literal("clearmageweapon")
+            .executes(FishMasterCommand::clearMageWeapon));
     }
 
+    // New dedicated method for opening settings screen
+    private static int openSettingsScreen(CommandContext<FabricClientCommandSource> context) {
+        MinecraftClient client = MinecraftClient.getInstance();
+
+        if (client.player == null) {
+            return 0;
+        }
+
+        // Send a message to confirm command was received
+        client.player.sendMessage(
+            Text.literal("[FishMaster] ").formatted(Formatting.AQUA)
+                .append(Text.literal("Opening settings screen...").formatted(Formatting.GREEN)), false);
+
+        try {
+            // Make sure we're on the main thread
+            if (client.isOnThread()) {
+                // We're already on the main thread, open directly
+                rohan.fishmaster.gui.FishMasterSettingsScreenKt.showFishMasterSettings();
+            } else {
+                // Schedule it to run on the main thread
+                client.execute(() -> {
+                    try {
+                        rohan.fishmaster.gui.FishMasterSettingsScreenKt.showFishMasterSettings();
+                    } catch (Exception e) {
+                        System.err.println("Error in scheduled execution: " + e.getMessage());
+                        e.printStackTrace();
+                    }
+                });
+            }
+
+            System.out.println("FishMaster: Command handler called showFishMasterSettings()");
+        } catch (Exception e) {
+            System.err.println("FishMaster: Error opening settings: " + e.getMessage());
+            e.printStackTrace();
+
+            // Inform the player about the error
+            client.player.sendMessage(
+                Text.literal("[FishMaster] ").formatted(Formatting.AQUA)
+                    .append(Text.literal("Error opening settings: " + e.getMessage()).formatted(Formatting.RED)), false);
+        }
+
+        return 1;
+    }
+
+    // Original showStatus method for other commands
     private static int showStatus(CommandContext<FabricClientCommandSource> context) {
         MinecraftClient client = MinecraftClient.getInstance();
 
@@ -50,8 +109,8 @@ public class FishMasterCommand {
         }
 
         // Show current status instead of opening GUI
-        boolean autoFishStatus = AutoFishingFeature.getInstance().isEnabled();
-        boolean seaCreatureStatus = SeaCreatureKiller.getInstance().isEnabled();
+        boolean autoFishStatus = AutoFishingFeature.isEnabled();
+        boolean seaCreatureStatus = SeaCreatureKiller.isEnabled();
 
         client.player.sendMessage(
             Text.literal("[FishMaster] ").formatted(Formatting.AQUA)
@@ -183,10 +242,7 @@ public class FishMasterCommand {
         long intervalMs = minutes * 60000L;
 
         FishMasterConfig.setHealthCheckInterval(intervalMs);
-
-        if (FishMasterConfig.isWebhookEnabled() && !FishMasterConfig.getWebhookUrl().isEmpty()) {
-            WebhookHandler.getInstance().updateWebhookSettings();
-        }
+        WebhookHandler.getInstance().updateWebhookSettings();
 
         client.player.sendMessage(
             Text.literal("[FishMaster] ").formatted(Formatting.AQUA)
@@ -208,7 +264,7 @@ public class FishMasterCommand {
 
         client.player.sendMessage(
             Text.literal("[FishMaster] ").formatted(Formatting.AQUA)
-                .append(Text.literal("Webhook URL cleared and disabled.").formatted(Formatting.YELLOW)), false);
+                .append(Text.literal("Webhook URL cleared and disabled!").formatted(Formatting.YELLOW)), false);
 
         return 1;
     }
@@ -220,40 +276,67 @@ public class FishMasterCommand {
             return 0;
         }
 
-        boolean webhookEnabled = FishMasterConfig.isWebhookEnabled();
-        String webhookUrl = FishMasterConfig.getWebhookUrl();
-        long intervalMinutes = FishMasterConfig.getHealthCheckInterval() / 60000;
-
         client.player.sendMessage(
             Text.literal("[FishMaster] ").formatted(Formatting.AQUA)
                 .append(Text.literal("Webhook Status:").formatted(Formatting.WHITE)), false);
 
         client.player.sendMessage(
             Text.literal("Enabled: ").formatted(Formatting.GRAY)
-                .append(Text.literal(webhookEnabled ? "YES" : "NO")
-                    .formatted(webhookEnabled ? Formatting.GREEN : Formatting.RED)), false);
+                .append(Text.literal(FishMasterConfig.isWebhookEnabled() ? "YES" : "NO")
+                    .formatted(FishMasterConfig.isWebhookEnabled() ? Formatting.GREEN : Formatting.RED)), false);
 
         client.player.sendMessage(
             Text.literal("URL: ").formatted(Formatting.GRAY)
-                .append(Text.literal(webhookUrl.isEmpty() ? "Not set" : "Set")
-                    .formatted(webhookUrl.isEmpty() ? Formatting.RED : Formatting.GREEN)), false);
+                .append(Text.literal(FishMasterConfig.getWebhookUrl().isEmpty() ? "Not set" : "Set")
+                    .formatted(FishMasterConfig.getWebhookUrl().isEmpty() ? Formatting.RED : Formatting.GREEN)), false);
 
         client.player.sendMessage(
             Text.literal("Health Check Interval: ").formatted(Formatting.GRAY)
-                .append(Text.literal(intervalMinutes + " minutes").formatted(Formatting.YELLOW)), false);
+                .append(Text.literal(FishMasterConfig.getHealthCheckInterval() / 60000 + " minutes").formatted(Formatting.YELLOW)), false);
+
+        return 1;
+    }
+
+    private static int setMageWeapon(CommandContext<FabricClientCommandSource> context) {
+        MinecraftClient client = MinecraftClient.getInstance();
+
+        if (client.player == null) {
+            return 0;
+        }
+
+        ItemStack heldItem = client.player.getMainHandStack();
+
+        if (heldItem.isEmpty()) {
+            client.player.sendMessage(
+                Text.literal("[FishMaster] ").formatted(Formatting.AQUA)
+                    .append(Text.literal("Hold the item you want to use as a mage weapon!").formatted(Formatting.RED)), false);
+            return 0;
+        }
+
+        String weaponName = heldItem.getName().getString();
+        FishMasterConfig.setCustomMageWeapon(weaponName);
 
         client.player.sendMessage(
-            Text.literal("Commands:").formatted(Formatting.YELLOW), false);
+            Text.literal("[FishMaster] ").formatted(Formatting.AQUA)
+                .append(Text.literal("Custom mage weapon set to: ")
+                    .append(Text.literal(weaponName).formatted(Formatting.YELLOW))), false);
+
+        return 1;
+    }
+
+    private static int clearMageWeapon(CommandContext<FabricClientCommandSource> context) {
+        MinecraftClient client = MinecraftClient.getInstance();
+
+        if (client.player == null) {
+            return 0;
+        }
+
+        // Clear the custom mage weapon
+        FishMasterConfig.setCustomMageWeapon("");
+
         client.player.sendMessage(
-            Text.literal("  /fmwh set <url> - Set webhook URL").formatted(Formatting.GRAY), false);
-        client.player.sendMessage(
-            Text.literal("  /fmwh enable/disable - Toggle webhook").formatted(Formatting.GRAY), false);
-        client.player.sendMessage(
-            Text.literal("  /fmwh test - Send test message").formatted(Formatting.GRAY), false);
-        client.player.sendMessage(
-            Text.literal("  /fmwh interval <minutes> - Set health check interval").formatted(Formatting.GRAY), false);
-        client.player.sendMessage(
-            Text.literal("  /fmwh clear - Clear webhook URL").formatted(Formatting.GRAY), false);
+            Text.literal("[FishMaster] ").formatted(Formatting.AQUA)
+                .append(Text.literal("Custom mage weapon cleared! SCK will not use any mage weapon until you set one.").formatted(Formatting.YELLOW)), false);
 
         return 1;
     }
