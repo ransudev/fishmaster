@@ -57,6 +57,13 @@ loom {
 			sourceSet sourceSets.client
 		}
 	}
+
+	// Add embedded JARs to the mod's nested JARs
+	runConfigs.configureEach {
+		// These libraries will be available during runtime
+		// This makes sure they're also available in the development environment
+		vmArg("-Dfabric.classPathGroups=${files("libs/elementa-710.jar", "libs/universalcraft-1.21.5-fabric-419.jar").asPath}")
+	}
 }
 
 dependencies {
@@ -77,11 +84,12 @@ dependencies {
 	implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3"
 	implementation "org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.7.3"
 
-	// Elementa GUI library from local libs folder - embedded in the final JAR
-	implementation(include(files("libs/elementa-710.jar")))
-
-	// UniversalCraft from local libs folder - embedded in the final JAR
-	modImplementation(include(files("libs/universalcraft-1.21.5-fabric-419.jar")))
+	// Include the external libraries using Fabric Loom's include method
+	// This embeds them in the final JAR
+	modImplementation files("libs/elementa-710.jar")
+	modImplementation files("libs/universalcraft-1.21.5-fabric-419.jar")
+	include files("libs/elementa-710.jar")
+	include files("libs/universalcraft-1.21.5-fabric-419.jar")
 
 	// Mark all Kotlin stdlib dependencies as provided to avoid conflicts
 	modCompileOnly "org.jetbrains.kotlin:kotlin-stdlib:2.1.20"
@@ -142,6 +150,52 @@ jar {
 	from("LICENSE") {
 		rename { "${it}_${project.archivesBaseName}"}
 	}
+
+	// Include all JARs from the libs directory
+	from fileTree(dir: 'libs', include: '*.jar').collect { zipTree(it) }
+
+	// Prevent duplicate files when including JARs
+	duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+// Configure Shadow plugin for embedding JARs
+shadowJar {
+    configurations = [project.configurations.shadow]
+    archiveClassifier.set('dev')
+
+    // Relocate the classes to avoid conflicts
+    relocate 'gg.essential.elementa', 'rohan.fishmaster.shadow.elementa'
+    relocate 'gg.essential.universal', 'rohan.fishmaster.shadow.universal'
+
+    // Merge services files
+    mergeServiceFiles()
+
+    // Exclude certain files that might cause conflicts
+    exclude 'META-INF/*.SF'
+    exclude 'META-INF/*.DSA'
+    exclude 'META-INF/*.RSA'
+    exclude 'module-info.class'
+
+    // Set the duplicate handling strategy
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+// Make remapJar task depend on shadowJar and use its output
+remapJar {
+    dependsOn(shadowJar)
+    input.set(shadowJar.archiveFile)
+}
+
+// Skip the original jar task by making it a copy of shadowJar
+jar {
+    archiveClassifier.set("dev-slim")
+
+    // Don't include all JARs in this task as shadowJar will handle it
+    from("LICENSE") {
+        rename { "${it}_${project.archivesBaseName}"}
+    }
+
+    enabled = false  // Disable the original jar task
 }
 
 // configure the maven publication

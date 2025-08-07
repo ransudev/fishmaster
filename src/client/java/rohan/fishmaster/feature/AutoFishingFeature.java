@@ -45,7 +45,7 @@ public class AutoFishingFeature {
     private static int castAttempts = 0;
     private static long lastCastTime = 0;
     private static boolean waitingForBobberSettle = false;
-    private static int bobberSettleTimer = 0;
+    private static int bobberSettleTimer = 2; // 2 seconds for bobber settle timer
     private static final int MAX_CAST_ATTEMPTS = 5;
     private static final long CAST_TIMEOUT = 3000; // 3 seconds to wait for bobber to settle
     private static final int BOBBER_SETTLE_DELAY = 40; // 2 seconds in ticks
