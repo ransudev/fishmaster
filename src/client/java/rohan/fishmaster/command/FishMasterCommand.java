@@ -67,35 +67,26 @@ public class FishMasterCommand {
         // Send a message to confirm command was received
         client.player.sendMessage(
             Text.literal("[FishMaster] ").formatted(Formatting.AQUA)
-                .append(Text.literal("Opening settings screen...").formatted(Formatting.GREEN)), false);
+                .append(Text.literal("Opening GUI...").formatted(Formatting.GREEN)), false);
 
-        try {
-            // Make sure we're on the main thread
-            if (client.isOnThread()) {
-                // We're already on the main thread, open directly
-                rohan.fishmaster.gui.FishMasterSettingsScreenKt.showFishMasterSettings();
-            } else {
-                // Schedule it to run on the main thread
-                client.execute(() -> {
-                    try {
-                        rohan.fishmaster.gui.FishMasterSettingsScreenKt.showFishMasterSettings();
-                    } catch (Exception e) {
-                        System.err.println("Error in scheduled execution: " + e.getMessage());
-                        e.printStackTrace();
-                    }
-                });
+        // Open the ClickGUI
+        client.execute(() -> {
+            try {
+                System.out.println("FishMaster: About to create GUI instance...");
+                rohan.fishmaster.gui.FishMasterGui gui = new rohan.fishmaster.gui.FishMasterGui();
+                System.out.println("FishMaster: GUI instance created successfully");
+                client.setScreen(gui);
+                System.out.println("FishMaster: GUI set as screen successfully");
+            } catch (Exception e) {
+                System.err.println("FishMaster: Error opening GUI: " + e.getMessage());
+                e.printStackTrace();
+                client.player.sendMessage(
+                    Text.literal("[FishMaster] ").formatted(Formatting.AQUA)
+                        .append(Text.literal("Error opening GUI: " + e.getMessage()).formatted(Formatting.RED)), false);
             }
+        });
 
-            System.out.println("FishMaster: Command handler called showFishMasterSettings()");
-        } catch (Exception e) {
-            System.err.println("FishMaster: Error opening settings: " + e.getMessage());
-            e.printStackTrace();
-
-            // Inform the player about the error
-            client.player.sendMessage(
-                Text.literal("[FishMaster] ").formatted(Formatting.AQUA)
-                    .append(Text.literal("Error opening settings: " + e.getMessage()).formatted(Formatting.RED)), false);
-        }
+        System.out.println("FishMaster: GUI opened successfully");
 
         return 1;
     }

@@ -44,16 +44,18 @@ public class AutoFishingFeature {
     // Recast mechanism variables
     private static int castAttempts = 0;
     private static long lastCastTime = 0;
-    private static boolean waitingForBobberSettle = false;
-    private static int bobberSettleTimer = 2; // 2 seconds for bobber settle timer
+    private static boolean justCaughtFish = false; // Flag to prevent recast mechanism after successful catch
+    private static long castStartTime = 0; // Track when casting started for bobber flight delay
     private static final int MAX_CAST_ATTEMPTS = 5;
-    private static final long CAST_TIMEOUT = 3000; // 3 seconds to wait for bobber to settle
-    private static final int BOBBER_SETTLE_DELAY = 40; // 2 seconds in ticks
+    private static final long CAST_TIMEOUT = 5000; // 5 seconds to wait for bobber to settle (increased from 3s)
     private static final int RECAST_DELAY = 2; // Fixed 2 ticks delay for both SCK on and off
+    private static final int BOBBER_FLIGHT_DELAY = 10; // 10 ticks (0.5 seconds) for bobber to fly
+    private static final long BOBBER_SETTLE_TIMEOUT = 3000; // 3 seconds for bobber to settle in water
+    private static final long MIN_RECAST_INTERVAL = 1000; // Minimum 1 second between recast attempts
 
     // Fishing timing variables
     private static long fishingStartTime = 0;
-    private static final long MIN_FISHING_TIME = 2000; // Minimum 2 seconds before checking for fish bites
+    private static final int MIN_FISHING_TICKS = 20; // 20 ticks (1 second) after bobber touches water
 
 
     // Player movement detection for failsafe
@@ -336,13 +338,21 @@ public class AutoFishingFeature {
 
             case CASTING:
                 if (client.player.fishHook != null && hasBobberInWater(client.player)) {
+                    // Bobber is in water - transition to fishing immediately
                     currentState = FishingState.FISHING;
                     isFishing = true;
                     fishingStartTime = System.currentTimeMillis(); // Record when fishing started
-                    sendDebugMessage("Bobber in water - State: CASTING → FISHING, starting fishing timer");
+                    castAttempts = 0; // Reset cast attempts on successful cast
+                    sendDebugMessage("Bobber in water - State: CASTING → FISHING, starting 20-tick delay");
                 } else {
-                    // Handle recast mechanism if bobber is not detected
-                    handleRecastMechanism(client);
+                    // Only try to recast if we haven't successfully cast yet
+                    // If we already have a bobber out, just wait (don't trigger recast mechanism)
+                    if (client.player.fishHook == null) {
+                        handleRecastMechanism(client);
+                    } else {
+                        // We have a bobber but it's not in water yet, just wait
+                        sendDebugMessage("Bobber exists but not in water yet - waiting...");
+                    }
                 }
                 break;
 
@@ -354,20 +364,21 @@ public class AutoFishingFeature {
                 } else if (hasBobberInWater(client.player)) {
                     // Only check for fish bites after minimum fishing time has passed
                     long timeFishing = System.currentTimeMillis() - fishingStartTime;
-                    if (timeFishing >= MIN_FISHING_TIME && detectArmorStandFishBite(client)) {
+                    if (timeFishing >= MIN_FISHING_TICKS * 50 && detectArmorStandFishBite(client)) {
                         long currentTimeMillis = System.currentTimeMillis();
                         if (currentTimeMillis - lastDetectionTime >= DETECTION_COOLDOWN) {
                             lastDetectionTime = currentTimeMillis;
                             sendDebugMessage("Fish detected after " + timeFishing + "ms of fishing! Reeling in...");
                             performSingleClick(client);
-                            // After catching a fish, reset to idle state and wait for bobber to settle
+                            // Set flag to indicate successful catch and reset state
+                            justCaughtFish = true;
                             resetFishingState();
-                            delayTimer = 2; // Fixed 2 ticks delay after catching fish
-                            sendDebugMessage("Fish caught - waiting " + 2 + " ticks before next cast");
+                            delayTimer = 20; // Wait 20 ticks before next cast
+                            sendDebugMessage("Fish caught - waiting " + 20 + " ticks before next cast");
                         }
-                    } else if (timeFishing < MIN_FISHING_TIME) {
+                    } else if (timeFishing < MIN_FISHING_TICKS * 50) {
                         // Still waiting for minimum fishing time
-                        long remainingTime = MIN_FISHING_TIME - timeFishing;
+                        long remainingTime = MIN_FISHING_TICKS * 50 - timeFishing;
                         if (remainingTime % 1000 == 0) { // Debug message every second
                             sendDebugMessage("Waiting for fish... " + (remainingTime / 1000) + "s remaining");
                         }
@@ -480,14 +491,14 @@ public class AutoFishingFeature {
         client.interactionManager.interactItem(client.player, hand);
 
         currentState = FishingState.CASTING;
-        // Use the proper bobber settling mechanism instead of a short delay
-        waitingForBobberSettle = true;
-        bobberSettleTimer = 2; // Fixed 2 ticks delay for settling
         castAttempts = 1; // This is the first attempt
         lastCastTime = System.currentTimeMillis();
         isFishing = false;
+        justCaughtFish = false; // Clear the flag when starting a new cast
+        castStartTime = lastCastTime; // Track when casting started
+        delayTimer = 10; // Add 10 tick delay after casting to let bobber fly
 
-        sendDebugMessage("Cast initiated - State: CASTING, Bobber settle timer: " + bobberSettleTimer + " ticks, Attempt: " + castAttempts);
+        sendDebugMessage("Cast initiated - State: CASTING, Attempt: " + castAttempts + ", waiting 10 ticks for bobber to fly");
     }
 
     private static void resetFishingState() {
@@ -498,8 +509,6 @@ public class AutoFishingFeature {
         // Reset recast mechanism variables
         int previousCastAttempts = castAttempts;
         castAttempts = 0;
-        waitingForBobberSettle = false;
-        bobberSettleTimer = 0;
         lastCastTime = 0;
 
         sendDebugMessage("Fishing state reset - Previous: " + previousState + " → Current: IDLE, Previous cast attempts: " + previousCastAttempts);
@@ -647,40 +656,21 @@ public class AutoFishingFeature {
         }
 
         long currentTime = System.currentTimeMillis();
-
-        // Check if we are waiting for the bobber to settle
-        if (waitingForBobberSettle) {
-            if (bobberSettleTimer > 0) {
-                bobberSettleTimer--;
-                return;
-            } else {
-                // Check if bobber is now in water after settling
-                if (client.player.fishHook != null && hasBobberInWater(client.player)) {
-                    // Success! Bobber is in water
-                    currentState = FishingState.FISHING;
-                    isFishing = true;
-                    waitingForBobberSettle = false;
-                    int successfulAttempts = castAttempts;
-                    castAttempts = 0; // Reset cast attempts on success
-                    if (successfulAttempts > 1) {
-                        sendFailsafeMessage("Bobber successfully cast after " + successfulAttempts + " attempts", false);
-                    }
-                    return;
-                } else {
-                    // Still not in water, prepare for recast
-                    waitingForBobberSettle = false;
-                }
-            }
-        }
+        
+        // Calculate time since cast started (including bobber flight time)
+        long timeSinceCastStart = currentTime - castStartTime;
+        long timeSinceLastCast = currentTime - lastCastTime;
 
         // Check if we've exceeded maximum cast attempts
         if (castAttempts >= MAX_CAST_ATTEMPTS) {
-            // Wait before trying again
-            if (currentTime - lastCastTime >= CAST_TIMEOUT) {
+            // Wait longer before trying again to account for bobber settle time
+            if (timeSinceLastCast >= CAST_TIMEOUT) {
+                sendDebugMessage("Resetting cast attempts after timeout - Time since last cast: " + timeSinceLastCast + "ms");
                 sendFailsafeMessage("Failed to cast bobber after " + MAX_CAST_ATTEMPTS + " attempts. Retrying...", false);
                 castAttempts = 0;
                 consecutiveFailures++;
-                lastCastTime = currentTime; // Reset the timer
+                lastCastTime = currentTime;
+                castStartTime = currentTime;
 
                 // If too many consecutive failures, trigger emergency stop
                 if (consecutiveFailures >= Math.max(3, FishMasterConfig.getMaxConsecutiveFailures() / 2)) {
@@ -691,12 +681,44 @@ public class AutoFishingFeature {
             return;
         }
 
-        // Check if enough time has passed since last cast attempt
-        if (currentTime - lastCastTime < RECAST_DELAY * 100) // Convert to milliseconds
-        {
+        // Don't attempt recast too quickly - respect minimum interval
+        if (timeSinceLastCast < MIN_RECAST_INTERVAL) {
+            sendDebugMessage("Recast interval not met - Time since last: " + timeSinceLastCast + "ms, Required: " + MIN_RECAST_INTERVAL + "ms");
             return;
         }
 
+        // Check if bobber exists but hasn't settled in water yet
+        if (client.player.fishHook != null) {
+            // If bobber exists but not in water, wait for settle timeout before attempting recast
+            if (!hasBobberInWater(client.player)) {
+                if (timeSinceCastStart < BOBBER_SETTLE_TIMEOUT) {
+                    // Still within settle timeout, just wait
+                    if (timeSinceCastStart % 1000 < 50) { // Debug message roughly every second
+                        sendDebugMessage("Waiting for bobber to settle - Time elapsed: " + timeSinceCastStart + "ms, Timeout: " + BOBBER_SETTLE_TIMEOUT + "ms");
+                    }
+                    return;
+                } else {
+                    // Bobber settle timeout exceeded, reel in and try again
+                    sendDebugMessage("Bobber settle timeout exceeded (" + timeSinceCastStart + "ms) - reeling in for recast");
+                    try {
+                        Hand hand = client.player.getStackInHand(Hand.MAIN_HAND).getItem() instanceof FishingRodItem ?
+                                   Hand.MAIN_HAND : Hand.OFF_HAND;
+                        client.interactionManager.interactItem(client.player, hand);
+                        delayTimer = RECAST_DELAY; // Wait before recasting
+                        lastCastTime = currentTime;
+                        castAttempts++;
+                        sendDebugMessage("Reeled in bobber due to settle timeout - Attempt: " + castAttempts);
+                    } catch (Exception e) {
+                        castAttempts++;
+                        sendFailsafeMessage("Failed to reel in bobber: " + e.getMessage(), false);
+                    }
+                }
+            }
+            // If bobber is in water, don't interfere - let normal fishing logic handle it
+            return;
+        }
+
+        // No bobber exists - need to cast
         // Ensure we have a valid fishing rod before attempting to cast
         if (!hasValidFishingRod()) {
             if (!switchToFishingRod()) {
@@ -705,53 +727,26 @@ public class AutoFishingFeature {
             }
         }
 
-        // If we have a bobber but it's not in water, reel it in first
-        if (client.player.fishHook != null && !hasBobberInWater(client.player)) {
-            try {
-                Hand hand = client.player.getStackInHand(Hand.MAIN_HAND).getItem() instanceof FishingRodItem ?
-                           Hand.MAIN_HAND : Hand.OFF_HAND;
-                client.interactionManager.interactItem(client.player, hand);
-                delayTimer = RECAST_DELAY; // Wait before recasting
-                lastCastTime = currentTime;
-            } catch (Exception e) {
-                castAttempts++;
-                sendFailsafeMessage("Failed to reel in bobber: " + e.getMessage(), false);
+        // Attempt to cast
+        try {
+            Hand hand = client.player.getStackInHand(Hand.MAIN_HAND).getItem() instanceof FishingRodItem ?
+                       Hand.MAIN_HAND : Hand.OFF_HAND;
+            client.interactionManager.interactItem(client.player, hand);
+            castAttempts++;
+            lastCastTime = currentTime;
+            delayTimer = BOBBER_FLIGHT_DELAY; // Wait for bobber to fly out
+
+            if (castAttempts > 1) {
+                sendDebugMessage("Recasting bobber (attempt " + castAttempts + "/" + MAX_CAST_ATTEMPTS + ") - waiting " + BOBBER_FLIGHT_DELAY + " ticks for flight");
+                sendFailsafeMessage("Recasting bobber (attempt " + castAttempts + "/" + MAX_CAST_ATTEMPTS + ")", false);
+            } else {
+                sendDebugMessage("Initial cast - waiting " + BOBBER_FLIGHT_DELAY + " ticks for bobber flight");
             }
-        } else if (client.player.fishHook == null) {
-            // No bobber exists, try to cast
-            try {
-                Hand hand = client.player.getStackInHand(Hand.MAIN_HAND).getItem() instanceof FishingRodItem ?
-                           Hand.MAIN_HAND : Hand.OFF_HAND;
-
-                // Verify the fishing rod is valid before casting
-                ItemStack rodStack = client.player.getStackInHand(hand);
-                if (!(rodStack.getItem() instanceof FishingRodItem) || rodStack.isEmpty()) {
-                    // Try the other hand
-                    hand = hand == Hand.MAIN_HAND ? Hand.OFF_HAND : Hand.MAIN_HAND;
-                    rodStack = client.player.getStackInHand(hand);
-                    if (!(rodStack.getItem() instanceof FishingRodItem) || rodStack.isEmpty()) {
-                        castAttempts++;
-                        sendFailsafeMessage("No valid fishing rod in hands for casting", false);
-                        return;
-                    }
-                }
-
-                client.interactionManager.interactItem(client.player, hand);
-
-                castAttempts++;
-                lastCastTime = currentTime;
-                waitingForBobberSettle = true;
-                bobberSettleTimer = 2; // Fixed 2 ticks delay for settling
-
-                if (castAttempts > 1) {
-                    sendFailsafeMessage("Recasting bobber (attempt " + castAttempts + "/" + MAX_CAST_ATTEMPTS + ")", false);
-                }
-            } catch (Exception e) {
-                castAttempts++;
-                consecutiveFailures++;
-                lastCastTime = currentTime;
-                sendFailsafeMessage("Failed to cast bobber: " + e.getMessage(), false);
-            }
+        } catch (Exception e) {
+            castAttempts++;
+            consecutiveFailures++;
+            lastCastTime = currentTime;
+            sendFailsafeMessage("Failed to cast bobber: " + e.getMessage(), false);
         }
     }
 
