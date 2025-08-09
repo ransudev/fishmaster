@@ -284,4 +284,16 @@ public class WebhookHandler {
             scheduler.shutdownNow();
         }
     }
+
+    /**
+     * Perform a health check - called by the responsive scheduler
+     */
+    public void performHealthCheck() {
+        if (!FishMasterConfig.isWebhookEnabled() || FishMasterConfig.getWebhookUrl().isEmpty()) {
+            return;
+        }
+
+        // Use the existing sendHealthCheck method
+        sendHealthCheck();
+    }
 }

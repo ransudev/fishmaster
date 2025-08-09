@@ -20,7 +20,7 @@ public class FishingFailsafe {
     // Bobber timeout failsafe
     private static long bobberInWaterTime = 0;
     private static boolean wasInWater = false;
-    private static final long BOBBER_TIMEOUT = 45000; // 45 seconds if bobber stays in water too long
+    private static final long BOBBER_TIMEOUT = 5000; // 5 seconds if bobber not touching water
 
     // Rod switching failsafe
     private static int rodSwitchAttempts = 0;
@@ -134,10 +134,10 @@ public class FishingFailsafe {
         long currentTime = System.currentTimeMillis();
 
         if (bobberInWaterTime > 0) {
-            long timeInWater = currentTime - bobberInWaterTime;
+            long timeNotInWater = currentTime - bobberInWaterTime;
 
-            if (timeInWater > BOBBER_TIMEOUT) {
-                sendFailsafeMessage(client, "Bobber stuck in water for too long (45s) - recasting...", Formatting.GOLD);
+            if (timeNotInWater > BOBBER_TIMEOUT) {
+                // Silent recast - no message shown to player
                 forceRecast(client);
                 return true;
             }
@@ -147,17 +147,30 @@ public class FishingFailsafe {
     }
 
     private static void updateBobberTracking(MinecraftClient client) {
-        boolean currentlyInWater = client.player.fishHook != null && client.player.fishHook.isTouchingWater();
+        // Check if bobber exists and is in a valid fishing state
+        boolean bobberExists = client.player.fishHook != null;
+        boolean currentlyInWater = bobberExists && client.player.fishHook.isTouchingWater();
+        boolean hookedToEntity = bobberExists && client.player.fishHook.getHookedEntity() != null;
 
-        if (currentlyInWater && !wasInWater) {
-            // Bobber just entered water
-            bobberInWaterTime = System.currentTimeMillis();
-        } else if (!currentlyInWater && wasInWater) {
-            // Bobber left water
+        if (bobberExists) {
+            // If bobber is in water and functioning properly, reset timer
+            if (currentlyInWater && !hookedToEntity) {
+                bobberInWaterTime = 0;
+                wasInWater = true;
+            }
+            // If bobber is not in water OR hooked to an entity, start/continue timing
+            else if (!currentlyInWater || hookedToEntity) {
+                if (bobberInWaterTime == 0) {
+                    // Start timing when bobber becomes non-functional
+                    bobberInWaterTime = System.currentTimeMillis();
+                }
+                wasInWater = false;
+            }
+        } else {
+            // No bobber exists, reset everything
             bobberInWaterTime = 0;
+            wasInWater = false;
         }
-
-        wasInWater = currentlyInWater;
     }
 
     /**

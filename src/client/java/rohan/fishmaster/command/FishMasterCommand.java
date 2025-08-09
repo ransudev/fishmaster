@@ -54,6 +54,10 @@ public class FishMasterCommand {
         // Register clearmageweapon command for convenience
         dispatcher.register(ClientCommandManager.literal("clearmageweapon")
             .executes(FishMasterCommand::clearMageWeapon));
+
+        // Register performance monitoring command
+        dispatcher.register(ClientCommandManager.literal("fmperf")
+            .executes(FishMasterCommand::showPerformanceStats));
     }
 
     // New dedicated method for opening settings screen
@@ -64,31 +68,13 @@ public class FishMasterCommand {
             return 0;
         }
 
-        // Send a message to confirm command was received
+        // Send WIP message since GUI is removed
         client.player.sendMessage(
             Text.literal("[FishMaster] ").formatted(Formatting.AQUA)
-                .append(Text.literal("Opening GUI...").formatted(Formatting.GREEN)), false);
+                .append(Text.literal("GUI is Work In Progress! Showing status instead...").formatted(Formatting.YELLOW)), false);
 
-        // Open the ClickGUI
-        client.execute(() -> {
-            try {
-                System.out.println("FishMaster: About to create GUI instance...");
-                rohan.fishmaster.gui.FishMasterGui gui = new rohan.fishmaster.gui.FishMasterGui();
-                System.out.println("FishMaster: GUI instance created successfully");
-                client.setScreen(gui);
-                System.out.println("FishMaster: GUI set as screen successfully");
-            } catch (Exception e) {
-                System.err.println("FishMaster: Error opening GUI: " + e.getMessage());
-                e.printStackTrace();
-                client.player.sendMessage(
-                    Text.literal("[FishMaster] ").formatted(Formatting.AQUA)
-                        .append(Text.literal("Error opening GUI: " + e.getMessage()).formatted(Formatting.RED)), false);
-            }
-        });
-
-        System.out.println("FishMaster: GUI opened successfully");
-
-        return 1;
+        // Show current status instead of opening GUI
+        return showStatus(context);
     }
 
     // Original showStatus method for other commands
@@ -328,6 +314,21 @@ public class FishMasterCommand {
         client.player.sendMessage(
             Text.literal("[FishMaster] ").formatted(Formatting.AQUA)
                 .append(Text.literal("Custom mage weapon cleared! SCK will not use any mage weapon until you set one.").formatted(Formatting.YELLOW)), false);
+
+        return 1;
+    }
+
+    private static int showPerformanceStats(CommandContext<FabricClientCommandSource> context) {
+        MinecraftClient client = MinecraftClient.getInstance();
+
+        if (client.player == null) {
+            return 0;
+        }
+
+        // For now, just show a placeholder message
+        client.player.sendMessage(
+            Text.literal("[FishMaster] ").formatted(Formatting.AQUA)
+                .append(Text.literal("Performance stats feature is a work in progress!").formatted(Formatting.YELLOW)), false);
 
         return 1;
     }
