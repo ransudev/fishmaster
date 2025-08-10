@@ -117,6 +117,13 @@ public class SeaCreatureKiller {
         TARGET_CREATURES.add("Wiki Tiki");
         TARGET_CREATURES.add("Frog man");
         TARGET_CREATURES.add("Bayou Sludgling");
+        TARGET_CREATURES.add("Frog Man");
+        TARGET_CREATURES.add("Bogged");
+        TARGET_CREATURES.add("Tadgang");
+        TARGET_CREATURES.add("Wetwing");
+        TARGET_CREATURES.add("Ent");
+        TARGET_CREATURES.add("Tidetot");
+        TARGET_CREATURES.add("Stridersurfer");
     }
 
     public static boolean isEnabled() {
