@@ -10,7 +10,7 @@ public class FishingFailsafe {
     // Fish bite timeout failsafe
     private static long lastCastTime = 0;
     private static long lastBiteDetectionTime = 0;
-    private static final long FISH_BITE_TIMEOUT = 30000; // 30 seconds in milliseconds
+    private static final long FISH_BITE_TIMEOUT = 20000; // 20 seconds in milliseconds (changed from 30)
 
     // General stuck detection
     private static long lastStateChangeTime = 0;
@@ -22,7 +22,7 @@ public class FishingFailsafe {
     private static boolean wasInWater = false;
     private static final long BOBBER_TIMEOUT = 5000; // 5 seconds if bobber not touching water
 
-    // Rod switching failsafe
+    // Rod switching failsafe variables (added missing variables)
     private static int rodSwitchAttempts = 0;
     private static long lastRodSwitchAttempt = 0;
     private static final int MAX_ROD_SWITCH_ATTEMPTS = 3;
@@ -103,9 +103,9 @@ public class FishingFailsafe {
         if (AutoFishingFeature.isFishing() && lastCastTime > 0) {
             long timeSinceCast = currentTime - lastCastTime;
 
-            // If we've been fishing for more than 30 seconds without a bite
+            // If we've been fishing for more than 20 seconds without a bite
             if (timeSinceCast > FISH_BITE_TIMEOUT) {
-                sendFailsafeMessage(client, "Fish bite timeout (30s) - recasting...", Formatting.YELLOW);
+                sendFailsafeMessage(client, "Fish bite timeout (20s) - recasting...", Formatting.YELLOW);
                 forceRecast(client);
                 return true;
             }
@@ -150,21 +150,23 @@ public class FishingFailsafe {
         // Check if bobber exists and is in a valid fishing state
         boolean bobberExists = client.player.fishHook != null;
         boolean currentlyInWater = bobberExists && client.player.fishHook.isTouchingWater();
+        boolean currentlyInLava = bobberExists && client.player.fishHook.isInLava();
         boolean hookedToEntity = bobberExists && client.player.fishHook.getHookedEntity() != null;
 
+        // Bobber is functional if it's in water OR lava and not hooked to an entity
+        boolean bobberFunctional = bobberExists && (currentlyInWater || currentlyInLava) && !hookedToEntity;
+
         if (bobberExists) {
-            // If bobber is in water and functioning properly, reset timer
-            if (currentlyInWater && !hookedToEntity) {
+            // If bobber is in water/lava and functioning properly, reset timer
+            if (bobberFunctional) {
                 bobberInWaterTime = 0;
                 wasInWater = true;
             }
-            // If bobber is not in water OR hooked to an entity, start/continue timing
-            else if (!currentlyInWater || hookedToEntity) {
-                if (bobberInWaterTime == 0) {
-                    // Start timing when bobber becomes non-functional
-                    bobberInWaterTime = System.currentTimeMillis();
-                }
-                wasInWater = false;
+            // If bobber is not in water/lava OR hooked to an entity, recast instantly
+            else if (!currentlyInWater && !currentlyInLava || hookedToEntity) {
+                // Instant recast when bobber is not touching water or lava
+                forceRecast(client);
+                return; // Exit early after triggering recast
             }
         } else {
             // No bobber exists, reset everything

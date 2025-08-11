@@ -2,6 +2,7 @@ package rohan.fishmaster;
 
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import rohan.fishmaster.config.FishMasterConfig;
 import rohan.fishmaster.handler.ClientTickHandler;
 import rohan.fishmaster.handler.DisconnectHandler;
@@ -9,6 +10,7 @@ import rohan.fishmaster.handler.WebhookHandler;
 import rohan.fishmaster.config.KeyBindings;
 import rohan.fishmaster.feature.AutoFishingFeature;
 import rohan.fishmaster.command.FishMasterCommand;
+import rohan.fishmaster.util.TickScheduler;
 
 public class FishMasterClient implements ClientModInitializer {
 
@@ -48,11 +50,20 @@ public class FishMasterClient implements ClientModInitializer {
                 WebhookHandler.getInstance().shutdown();
             }));
 
+            // Register the main tick event for auto fishing
+            ClientTickEvents.END_CLIENT_TICK.register(client -> {
+                TickScheduler.tick(); // Process scheduled tasks
+                if (client.player != null && client.world != null) {
+                    AutoFishingFeature.tick();
+                    rohan.fishmaster.feature.SeaCreatureKiller.tick();
+                }
+            });
+
             // Ensure fishing tracker is always enabled
             FishMasterConfig.setFishingTrackerEnabled(true);
 
             initialized = true;
-            System.out.println("[FishMaster] Core mod initialized successfully with responsive scheduler!");
+            System.out.println("[FishMaster] Core mod initialized successfully!");
 
         } catch (Exception e) {
             System.err.println("[FishMaster] Failed to initialize core mod: " + e.getMessage());

@@ -80,6 +80,13 @@ public class AutoFishingFeature {
     private static final int ANTI_AFK_INTERVAL = 200; // Move every 10 seconds (200 ticks)
     private static final float CROSSHAIR_MOVEMENT_RANGE = 1.8f; // Further decreased movement range for more subtle anti-AFK
 
+    // Smooth anti-AFK transition variables
+    private static boolean isTransitioning = false;
+    private static float targetYaw = 0f;
+    private static float startYaw = 0f;
+    private static int transitionTicks = 0;
+    private static final int TRANSITION_DURATION = 60; // 3 seconds for smooth transition (60 ticks)
+
     static {
         // Initialize fishing events - but don't register keybindings here
         // KeyBindings are now registered in FishMasterClient.onInitializeClient()
@@ -808,21 +815,55 @@ public class AutoFishingFeature {
     private static void handleAntiAfk(MinecraftClient client) {
         if (!antiAfkEnabled || client.player == null) return;
 
-        antiAfkTimer++;
+        // Handle smooth transition if one is in progress
+        if (isTransitioning) {
+            transitionTicks++;
+            float progress = (float)transitionTicks / TRANSITION_DURATION;
 
+            // Use smooth easing function for more natural movement
+            float easedProgress = (float)(1 - Math.cos(progress * Math.PI)) / 2; // Smooth cosine interpolation
+
+            float newYaw = startYaw + (targetYaw - startYaw) * easedProgress;
+            client.player.setYaw(newYaw);
+
+            if (transitionTicks >= TRANSITION_DURATION) {
+                // Transition complete
+                isTransitioning = false;
+                transitionTicks = 0;
+                client.player.setYaw(targetYaw); // Ensure we end at exact target
+                sendDebugMessage("Anti-AFK smooth transition complete - Final yaw: " + targetYaw);
+            }
+            return;
+        }
+
+        // Check if it's time to start a new anti-AFK movement
+        antiAfkTimer++;
         if (antiAfkTimer >= ANTI_AFK_INTERVAL) {
             antiAfkTimer = 0;
 
-            // Perform a random movement action to simulate player activity
+            // Start a new smooth transition
             try {
-                // Randomly choose between a small left/right movement
+                startYaw = client.player.getYaw();
+
+                // Randomly choose direction and calculate target yaw
                 if (random.nextBoolean()) {
-                    client.player.setYaw(client.player.getYaw() + CROSSHAIR_MOVEMENT_RANGE);
+                    targetYaw = startYaw + CROSSHAIR_MOVEMENT_RANGE;
                 } else {
-                    client.player.setYaw(client.player.getYaw() - CROSSHAIR_MOVEMENT_RANGE);
+                    targetYaw = startYaw - CROSSHAIR_MOVEMENT_RANGE;
                 }
+
+                // Normalize yaw to -180 to 180 range
+                while (targetYaw > 180f) targetYaw -= 360f;
+                while (targetYaw < -180f) targetYaw += 360f;
+
+                // Start the smooth transition
+                isTransitioning = true;
+                transitionTicks = 0;
+
+                sendDebugMessage("Starting anti-AFK smooth transition - From: " + startYaw + " to: " + targetYaw + " over " + TRANSITION_DURATION + " ticks");
+
             } catch (Exception e) {
-                sendDebugMessage("Error performing anti-AFK movement: " + e.getMessage());
+                sendDebugMessage("Error starting anti-AFK movement: " + e.getMessage());
             }
         }
     }

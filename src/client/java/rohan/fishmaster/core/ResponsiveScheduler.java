@@ -123,10 +123,10 @@ public class ResponsiveScheduler {
     public void tick() {
         currentTick++;
         updateFrameTimeTracking();
-
+        
         // Update performance monitoring
         PerformanceMonitor.getInstance().updateFps();
-
+        
         adaptiveExecute();
     }
 

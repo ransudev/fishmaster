@@ -14,6 +14,8 @@ import rohan.fishmaster.config.FishMasterConfig;
 import rohan.fishmaster.feature.AutoFishingFeature;
 import rohan.fishmaster.feature.SeaCreatureKiller;
 import rohan.fishmaster.handler.WebhookHandler;
+import rohan.fishmaster.gui.FishmasterScreen;
+import rohan.fishmaster.util.TickScheduler;
 
 public class FishMasterCommand {
 
@@ -62,19 +64,12 @@ public class FishMasterCommand {
 
     // New dedicated method for opening settings screen
     private static int openSettingsScreen(CommandContext<FabricClientCommandSource> context) {
-        MinecraftClient client = MinecraftClient.getInstance();
+        // Schedule screen opening on the main client thread via TickScheduler
+        TickScheduler.schedule(() -> {
+            MinecraftClient.getInstance().setScreen(new FishmasterScreen());
+        });
 
-        if (client.player == null) {
-            return 0;
-        }
-
-        // Send WIP message since GUI is removed
-        client.player.sendMessage(
-            Text.literal("[FishMaster] ").formatted(Formatting.AQUA)
-                .append(Text.literal("GUI is Work In Progress! Showing status instead...").formatted(Formatting.YELLOW)), false);
-
-        // Show current status instead of opening GUI
-        return showStatus(context);
+        return 1;
     }
 
     // Original showStatus method for other commands

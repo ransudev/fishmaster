@@ -46,69 +46,69 @@ public class PerformanceMonitor {
         
         // Check for slow tasks
         if (executionTimeNanos > SLOW_TASK_THRESHOLD) {
-            System.out.println("[PerformanceMonitor] Slow task detected: " + taskName +
+            System.out.println("[PerformanceMonitor] Slow task detected: " + taskName + 
                 " took " + (executionTimeNanos / 1_000_000.0) + "ms");
         }
     }
-
+    
     /**
      * Update FPS tracking
      */
     public void updateFps() {
         frameCount++;
         long currentTime = System.currentTimeMillis();
-
+        
         if (currentTime - fpsCheckStartTime >= 1000) { // Update every second
             averageFps = (frameCount * 1000.0) / (currentTime - fpsCheckStartTime);
             frameCount = 0;
             fpsCheckStartTime = currentTime;
-
+            
             // Check if we need to enter performance mode
             checkPerformanceMode();
         }
     }
-
+    
     private void checkPerformanceMode() {
         long currentTime = System.currentTimeMillis();
         if (currentTime - lastPerformanceCheck < 5000) return; // Check every 5 seconds
-
+        
         lastPerformanceCheck = currentTime;
-
+        
         boolean shouldEnablePerformanceMode = averageFps < LOW_FPS_THRESHOLD;
-
+        
         if (shouldEnablePerformanceMode && !performanceMode) {
             performanceMode = true;
-            System.out.println("[PerformanceMonitor] Low FPS detected (" + String.format("%.1f", averageFps) +
+            System.out.println("[PerformanceMonitor] Low FPS detected (" + String.format("%.1f", averageFps) + 
                 "), enabling performance mode");
             applyPerformanceOptimizations();
         } else if (!shouldEnablePerformanceMode && performanceMode && averageFps > HIGH_FPS_THRESHOLD) {
             performanceMode = false;
-            System.out.println("[PerformanceMonitor] FPS improved (" + String.format("%.1f", averageFps) +
+            System.out.println("[PerformanceMonitor] FPS improved (" + String.format("%.1f", averageFps) + 
                 "), disabling performance mode");
             removePerformanceOptimizations();
         }
     }
-
+    
     private void applyPerformanceOptimizations() {
         ResponsiveScheduler scheduler = ResponsiveScheduler.getInstance();
-
+        
         // Reduce frequency of low-priority tasks
         scheduler.scheduleOnce("performance_optimization", () -> {
             // Notify features to reduce their processing
             System.out.println("[PerformanceMonitor] Applied performance optimizations");
         }, ResponsiveScheduler.Priority.BACKGROUND);
     }
-
+    
     private void removePerformanceOptimizations() {
         ResponsiveScheduler scheduler = ResponsiveScheduler.getInstance();
-
+        
         // Restore normal frequency
         scheduler.scheduleOnce("performance_restoration", () -> {
             // Notify features to restore normal processing
             System.out.println("[PerformanceMonitor] Restored normal performance settings");
         }, ResponsiveScheduler.Priority.BACKGROUND);
     }
-
+    
     /**
      * Get performance statistics
      */
@@ -117,7 +117,7 @@ public class PerformanceMonitor {
         stats.put("averageFps", String.format("%.1f", averageFps));
         stats.put("performanceMode", performanceMode);
         stats.put("taskCount", taskExecutionCounts.size());
-
+        
         // Calculate average execution times
         Map<String, String> avgExecutionTimes = new HashMap<>();
         for (Map.Entry<String, Long> entry : taskExecutionTimes.entrySet()) {
@@ -128,10 +128,10 @@ public class PerformanceMonitor {
             avgExecutionTimes.put(taskName, String.format("%.3f ms", avgTime));
         }
         stats.put("averageExecutionTimes", avgExecutionTimes);
-
+        
         return stats;
     }
-
+    
     /**
      * Get slowest tasks
      */
@@ -150,21 +150,21 @@ public class PerformanceMonitor {
             })
             .toList();
     }
-
+    
     /**
      * Check if we're in performance mode
      */
     public boolean isPerformanceMode() {
         return performanceMode;
     }
-
+    
     /**
      * Get current FPS
      */
     public double getCurrentFps() {
         return averageFps;
     }
-
+    
     /**
      * Clear all statistics
      */
