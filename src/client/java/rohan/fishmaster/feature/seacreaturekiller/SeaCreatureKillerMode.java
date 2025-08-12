@@ -2,89 +2,69 @@ package rohan.fishmaster.feature.seacreaturekiller;
 
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.entity.Entity;
+import net.minecraft.item.ItemStack;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
-import net.minecraft.util.math.Vec3d;
-import rohan.fishmaster.config.FishMasterConfig;
 
 /**
- * Abstract base class for different Sea Creature Killer attack modes
+ * Base class for Sea Creature Killer modes
+ * Now only handles attack logic - combat entry/exit is managed by SeaCreatureKiller
  */
 public abstract class SeaCreatureKillerMode {
-
     protected static final double DETECTION_RANGE = 6.0;
-    protected static final long ATTACK_COOLDOWN = 250;
-
-    protected Entity targetEntity;
-    protected long lastAttackTime = 0;
-    public boolean inCombatMode = false;
 
     /**
-     * Called when entering combat mode with a target
+     * Perform the attack for this mode
+     * @param target The entity to attack
      */
-    public abstract void enterCombat(Entity target);
+    public abstract void performAttack(Entity target);
 
     /**
-     * Called every tick to perform combat actions
-     */
-    public abstract void performCombat();
-
-    /**
-     * Called when exiting combat mode
-     */
-    public abstract void exitCombat();
-
-    /**
-     * Returns the display name for this mode
+     * Get the display name for this mode
+     * @return Mode name for display
      */
     public abstract String getModeName();
 
     /**
-     * Checks if this mode can currently attack
+     * Check if the player can attack (cooldown check)
+     * @return true if attack is ready
      */
     protected boolean canAttack() {
-        return System.currentTimeMillis() - lastAttackTime > ATTACK_COOLDOWN;
+        // This is now handled by SeaCreatureKiller centrally
+        return true;
     }
 
     /**
-     * Updates the last attack time
+     * Update the last attack time - deprecated, handled centrally now
      */
+    @Deprecated
     protected void updateAttackTime() {
-        lastAttackTime = System.currentTimeMillis();
+        // No longer needed - handled centrally
     }
 
     /**
-     * Sends a combat message to the player
+     * Send combat message - deprecated, handled centrally now
      */
-    protected void sendCombatMessage(String message) {
-        MinecraftClient client = MinecraftClient.getInstance();
-        if (client.player != null) {
-            client.player.sendMessage(Text.literal("SCK: ").formatted(Formatting.RED)
-                .append(Text.literal("COMBAT").formatted(Formatting.BOLD, Formatting.RED))
-                .append(Text.literal(" - " + message).formatted(Formatting.YELLOW)), false);
-        }
+    @Deprecated
+    protected void sendCombatMessage(String entityName) {
+        // No longer needed - handled centrally
     }
 
     /**
-     * Gets the display name of an entity
+     * Get entity display name helper
      */
     protected String getEntityDisplayName(Entity entity) {
         if (entity == null) return "";
 
-        // Try to get the display name first
         if (entity.hasCustomName() && entity.getCustomName() != null) {
             return entity.getCustomName().getString();
         }
 
-        // Get the entity type name
         String typeName = entity.getType().getTranslationKey();
-
-        // Remove the "entity.minecraft." prefix if present
         if (typeName.startsWith("entity.minecraft.")) {
             typeName = typeName.substring("entity.minecraft.".length());
         }
 
-        // Convert underscores to spaces and capitalize
         typeName = typeName.replace("_", " ");
         String[] words = typeName.split(" ");
         StringBuilder result = new StringBuilder();
@@ -97,15 +77,49 @@ public abstract class SeaCreatureKillerMode {
                 }
             }
         }
-
         return result.toString();
     }
 
-    /**
-     * Gets the player's position
-     */
-    protected Vec3d getPlayerPosition() {
-        MinecraftClient client = MinecraftClient.getInstance();
-        return client.player != null ? client.player.getPos() : Vec3d.ZERO;
+    // Weapon detection helper methods
+    protected boolean isMageWeapon(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) return false;
+
+        String displayName = stack.getName().getString().toLowerCase();
+        String customWeapon = rohan.fishmaster.config.FishMasterConfig.getCustomMageWeapon().toLowerCase();
+
+        if (customWeapon.isEmpty()) return false;
+        return displayName.contains(customWeapon);
+    }
+
+    protected boolean isMeleeWeapon(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) return false;
+
+        String displayName = stack.getName().getString().toLowerCase();
+        String customWeapon = rohan.fishmaster.config.FishMasterConfig.getCustomMeleeWeapon().toLowerCase();
+
+        if (customWeapon.isEmpty()) return false;
+
+        return displayName.contains(customWeapon);
+    }
+
+    protected boolean isFishingRod(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) return false;
+
+        String itemName = stack.getItem().toString().toLowerCase();
+        String displayName = stack.getName().getString().toLowerCase();
+
+        return itemName.contains("fishing_rod") ||
+               displayName.contains("fishing rod") ||
+               displayName.contains("rod of the sea") ||
+               displayName.contains("auger rod") ||
+               displayName.contains("prismarine rod") ||
+               displayName.contains("winter rod") ||
+               displayName.contains("challenging rod") ||
+               displayName.contains("lucky rod") ||
+               displayName.contains("magma rod") ||
+               displayName.contains("lava rod") ||
+               displayName.contains("salty rod") ||
+               displayName.contains("rod of legends") ||
+               displayName.contains("rod of championing");
     }
 }

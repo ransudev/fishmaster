@@ -2,52 +2,24 @@ package rohan.fishmaster.feature.seacreaturekiller;
 
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.entity.Entity;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
 
 /**
- * Fire Veil Wand mode - Uses Fire Veil Wand for ranged attacks
- * TODO: Implement Fire Veil Wand attack logic
+ * Fire Veil Wand mode - Work in Progress
  */
 public class FireVeilWandMode extends SeaCreatureKillerMode {
-    
+
     @Override
-    public void enterCombat(Entity target) {
-        this.targetEntity = target;
-        this.inCombatMode = true;
-        
+    public void performAttack(Entity target) {
         MinecraftClient client = MinecraftClient.getInstance();
-        if (client.player != null) {
-            client.player.sendMessage(Text.literal("SCK: ").formatted(Formatting.YELLOW)
-                .append(Text.literal("FIRE VEIL WAND MODE - Work In Progress").formatted(Formatting.BOLD, Formatting.YELLOW)), false);
-        }
+        if (client.player == null) return;
+
+        // Fire Veil Wand mode is work in progress
+        client.player.sendMessage(net.minecraft.text.Text.literal("SCK: ")
+            .formatted(net.minecraft.util.Formatting.YELLOW)
+            .append(net.minecraft.text.Text.literal("Fire Veil Wand mode is Work In Progress!")
+            .formatted(net.minecraft.util.Formatting.RED)), false);
     }
-    
-    @Override
-    public void performCombat() {
-        // TODO: Implement Fire Veil Wand combat logic
-        // - Find and equip Fire Veil Wand
-        // - Aim at target creature
-        // - Use Fire Veil Wand ability
-        // - Handle cooldowns and mana management
-        
-        // For now, just exit combat to prevent getting stuck
-        if (targetEntity != null && targetEntity.isRemoved()) {
-            exitCombat();
-        }
-    }
-    
-    @Override
-    public void exitCombat() {
-        targetEntity = null;
-        inCombatMode = false;
-        
-        // TODO: Implement cleanup logic
-        // - Switch back to fishing rod
-        // - Reset player rotation
-        // - Handle any Fire Veil Wand specific cleanup
-    }
-    
+
     @Override
     public String getModeName() {
         return "Fire Veil Wand";

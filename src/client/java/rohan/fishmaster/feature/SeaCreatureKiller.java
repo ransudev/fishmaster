@@ -5,12 +5,16 @@ import net.minecraft.entity.Entity;
 import net.minecraft.entity.mob.*;
 import net.minecraft.entity.passive.SquidEntity;
 import net.minecraft.entity.passive.GlowSquidEntity;
+import net.minecraft.item.ItemStack;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
+import net.minecraft.util.Hand;
 import net.minecraft.util.math.Box;
+import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
 import rohan.fishmaster.config.FishMasterConfig;
 import rohan.fishmaster.feature.seacreaturekiller.*;
+import rohan.fishmaster.utils.AngleUtils;
 
 import java.util.List;
 import java.util.Set;
@@ -24,7 +28,31 @@ public class SeaCreatureKiller {
     private static final double DETECTION_RANGE = 6.0;
     private static int killCount = 0;
     
-    // Mode system
+    // Combat state variables
+    private static boolean inCombatMode = false;
+    private static long lastAttackTime = 0;
+    private static final long ATTACK_COOLDOWN = 500; // 500ms between attacks
+
+    // Rotation and weapon switching variables (managed centrally)
+    private static float originalYaw = 0.0f;
+    private static float originalPitch = 0.0f;
+    private static boolean isTransitioning = false;
+    private static long transitionStartTime = 0;
+    private static final long TRANSITION_DURATION = 350;
+    private static float transitionStartYaw = 0.0f;
+    private static float transitionStartPitch = 0.0f;
+    private static boolean isTransitioningToGround = false;
+    private static boolean canAttack = false;
+
+    // Weapon switching variables
+    private static long lastWeaponSwitchTime = 0;
+    private static final long WEAPON_SWITCH_DELAY = 400;
+    private static final long COMBAT_TO_FISHING_DELAY = 200;
+    private static boolean needsToSwitchBack = false;
+    private static long combatEndTime = 0;
+    private static int originalSlot = -1;
+
+    // Mode system - only for attack methods
     private static SeaCreatureKillerMode currentMode;
     private static RCMMode rcmMode = new RCMMode();
     private static MeleeMode meleeMode = new MeleeMode();
@@ -118,8 +146,8 @@ public class SeaCreatureKiller {
         String status = enabled ? "ENABLED" : "DISABLED";
         MinecraftClient.getInstance().player.sendMessage(Text.literal("[FishMaster] Sea Creature Killer: " + status).formatted(enabled ? Formatting.GREEN : Formatting.RED), false);
         
-        if (!enabled && currentMode != null) {
-            currentMode.exitCombat();
+        if (!enabled) {
+            exitCombat();
         }
     }
 
@@ -133,8 +161,8 @@ public class SeaCreatureKiller {
                 MinecraftClient.getInstance().player.sendMessage(Text.literal("[FishMaster] Sea Creature Killer: " + status).formatted(enabled ? Formatting.GREEN : Formatting.RED), false);
             }
             
-            if (!enabled && currentMode != null) {
-                currentMode.exitCombat();
+            if (!enabled) {
+                exitCombat();
             }
         }
     }
@@ -153,9 +181,7 @@ public class SeaCreatureKiller {
                 }
             } else {
                 if (enabled) {
-                    if (currentMode != null) {
-                        currentMode.exitCombat();
-                    }
+                    exitCombat();
                     targetEntity = null;
                     
                     client.player.sendMessage(Text.literal("SCK: ").formatted(Formatting.YELLOW)
@@ -193,54 +219,261 @@ public class SeaCreatureKiller {
         // Update mode if it changed in config
         updateMode();
 
-        // Check if current target is still valid
-        if (targetEntity != null && (targetEntity.isRemoved() || !isTargetSeaCreature(targetEntity) ||
+        // Check if current target is still valid (only while in combat mode)
+        if (inCombatMode && targetEntity != null && (targetEntity.isRemoved() || !isTargetSeaCreature(targetEntity) ||
             client.player.distanceTo(targetEntity) > DETECTION_RANGE)) {
-            
-            if (currentMode != null) {
-                currentMode.exitCombat();
-            }
-            targetEntity = null;
+            exitCombat();
+            return;
         }
 
-        // Find new target if we don't have one
-        if (targetEntity == null) {
-            findNearestTargetCreature();
+        // Handle post-combat transitions and weapon switching
+        if (!inCombatMode) {
+            // Handle weapon switching back to fishing rod after combat
+            if (needsToSwitchBack && System.currentTimeMillis() - combatEndTime > COMBAT_TO_FISHING_DELAY) {
+                switchBackToFishingRod();
+            }
+
+            // Update rotations if transitioning back to original position
+            if (isTransitioning) {
+                updateRotationTransition();
+                return;
+            }
+
+            // Find new target if we don't have one and not transitioning
+            if (targetEntity == null) {
+                findNearestTargetCreature();
+            }
+
+            // Enter combat mode if we have a target
+            if (targetEntity != null) {
+                enterCombat(targetEntity);
+            }
+            return;
         }
 
-        // Enter combat mode if we have a target
-        if (targetEntity != null && currentMode != null) {
-            if (!currentMode.inCombatMode) {
-                currentMode.enterCombat(targetEntity);
-            }
-            currentMode.performCombat();
+        // Combat mode active - handle transitions and attacks
+
+        // Update rotations if transitioning to ground (for RCM mode)
+        if (isTransitioningToGround) {
+            updateStartupRotation();
+            return; // Don't attack until transition is complete
+        }
+
+        // Delegate attack to the current mode
+        if (targetEntity != null && canAttack() && currentMode != null) {
+            currentMode.performAttack(targetEntity);
+            lastAttackTime = System.currentTimeMillis();
         }
     }
 
-    private static void findNearestTargetCreature() {
+    /**
+     * Centralized combat entry logic
+     */
+    private static void enterCombat(Entity target) {
+        targetEntity = target;
+        inCombatMode = true;
+
         MinecraftClient client = MinecraftClient.getInstance();
-        if (client.player == null || client.world == null) return;
+        if (client.player != null) {
+            // Store original rotation and slot for restoration later
+            originalYaw = client.player.getYaw();
+            originalPitch = client.player.getPitch();
+            originalSlot = client.player.getInventory().getSelectedSlot();
 
-        Vec3d playerPos = client.player.getPos();
-        Box searchBox = new Box(
-            playerPos.x - DETECTION_RANGE, playerPos.y - DETECTION_RANGE, playerPos.z - DETECTION_RANGE,
-            playerPos.x + DETECTION_RANGE, playerPos.y + DETECTION_RANGE, playerPos.z + DETECTION_RANGE
-        );
+            String mode = FishMasterConfig.getSeaCreatureKillerMode();
 
-        List<Entity> entities = client.world.getOtherEntities(client.player, searchBox, SeaCreatureKiller::isTargetSeaCreature);
-
-        Entity nearestCreature = null;
-        double nearestDistance = Double.MAX_VALUE;
-
-        for (Entity entity : entities) {
-            double distance = client.player.distanceTo(entity);
-            if (distance < nearestDistance && distance <= DETECTION_RANGE) {
-                nearestDistance = distance;
-                nearestCreature = entity;
+            if ("RCM".equals(mode)) {
+                // Start transition to look at ground for RCM mode
+                transitionStartYaw = client.player.getYaw();
+                transitionStartPitch = client.player.getPitch();
+                isTransitioningToGround = true;
+                transitionStartTime = System.currentTimeMillis();
+                canAttack = false;
+            } else {
+                // For melee modes, we can attack immediately
+                canAttack = true;
             }
+
+            lastWeaponSwitchTime = System.currentTimeMillis();
+            needsToSwitchBack = false;
+
+            sendCombatMessage(getEntityDisplayName(target));
+        }
+    }
+
+    /**
+     * Centralized combat exit logic with fishing resumption
+     */
+    private static void exitCombat() {
+        if (inCombatMode) {
+            combatEndTime = System.currentTimeMillis();
+            needsToSwitchBack = true;
+
+            String mode = FishMasterConfig.getSeaCreatureKillerMode();
+            if ("RCM".equals(mode)) {
+                startRotationTransition();
+            } else {
+                // For melee modes, just switch back to fishing rod
+                isTransitioning = false;
+            }
+
+            killCount++;
         }
 
-        targetEntity = nearestCreature;
+        targetEntity = null;
+        inCombatMode = false;
+        canAttack = false;
+        isTransitioningToGround = false;
+    }
+
+    private static boolean canAttack() {
+        return canAttack && System.currentTimeMillis() - lastAttackTime > ATTACK_COOLDOWN;
+    }
+
+    private static void sendCombatMessage(String entityName) {
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (client.player != null) {
+            client.player.sendMessage(Text.literal("SCK: ")
+                .formatted(Formatting.RED)
+                .append(Text.literal("Attacking " + entityName)
+                .formatted(Formatting.YELLOW)), false);
+        }
+    }
+
+    // Rotation transition methods for RCM mode
+    private static void updateRotationTransition() {
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (client.player == null) return;
+
+        long currentTime = System.currentTimeMillis();
+        float progress = MathHelper.clamp((currentTime - transitionStartTime) / (float)TRANSITION_DURATION, 0.0f, 1.0f);
+
+        float[] rotationResult = AngleUtils.smoothRotationInterpolation(
+            transitionStartYaw, transitionStartPitch,
+            originalYaw, originalPitch,
+            progress
+        );
+
+        client.player.setYaw(rotationResult[0]);
+        client.player.setPitch(rotationResult[1]);
+
+        if (progress >= 1.0f) {
+            isTransitioning = false;
+            client.player.setYaw(AngleUtils.normalizeYaw(originalYaw));
+            client.player.setPitch(originalPitch);
+        }
+    }
+
+    private static void updateStartupRotation() {
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (client.player == null) return;
+
+        long currentTime = System.currentTimeMillis();
+        float progress = MathHelper.clamp((currentTime - transitionStartTime) / (float)TRANSITION_DURATION, 0.0f, 1.0f);
+        float easedProgress = AngleUtils.easeInOutCubic(progress);
+
+        float targetPitch = 90.0f;
+        float currentYaw = client.player.getYaw();
+        float yawDiff = AngleUtils.getShortestRotationPath(transitionStartYaw, currentYaw);
+
+        float newYaw = transitionStartYaw + (yawDiff * easedProgress * 0.1f);
+        float newPitch = transitionStartPitch + ((targetPitch - transitionStartPitch) * easedProgress);
+
+        newYaw = AngleUtils.normalizeYaw(newYaw);
+        newPitch = AngleUtils.clampPitch(newPitch);
+
+        client.player.setYaw(newYaw);
+        client.player.setPitch(newPitch);
+
+        if (progress >= 1.0f) {
+            isTransitioningToGround = false;
+            canAttack = true;
+            client.player.setPitch(90.0f);
+        }
+    }
+
+    private static void startRotationTransition() {
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (client.player == null) return;
+
+        transitionStartYaw = AngleUtils.normalizeYaw(client.player.getYaw());
+        transitionStartPitch = AngleUtils.clampPitch(client.player.getPitch());
+        isTransitioning = true;
+        transitionStartTime = System.currentTimeMillis();
+    }
+
+    private static void switchBackToFishingRod() {
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (client.player == null || inCombatMode || originalSlot == -1) return;
+
+        long currentTime = System.currentTimeMillis();
+        if (currentTime - lastWeaponSwitchTime < WEAPON_SWITCH_DELAY) return;
+
+        ItemStack originalItem = client.player.getInventory().getStack(originalSlot);
+        if (isFishingRod(originalItem)) {
+            client.player.getInventory().setSelectedSlot(originalSlot);
+            lastWeaponSwitchTime = currentTime;
+            needsToSwitchBack = false;
+            originalSlot = -1;
+
+            // Resume fishing after a short delay to ensure rotation transition is complete
+            triggerFishingResumption();
+        } else {
+            // Find any fishing rod if original slot doesn't have one
+            for (int i = 0; i < 9; i++) {
+                ItemStack stack = client.player.getInventory().getStack(i);
+                if (isFishingRod(stack)) {
+                    client.player.getInventory().setSelectedSlot(i);
+                    lastWeaponSwitchTime = currentTime;
+                    needsToSwitchBack = false;
+                    originalSlot = -1;
+
+                    // Resume fishing after a short delay to ensure rotation transition is complete
+                    triggerFishingResumption();
+                    break;
+                }
+            }
+        }
+    }
+
+    private static void triggerFishingResumption() {
+        // Schedule fishing resumption after a brief delay to ensure transitions are complete
+        new Thread(() -> {
+            try {
+                Thread.sleep(500); // Wait for rotation transition to complete
+
+                MinecraftClient client = MinecraftClient.getInstance();
+                if (client.player != null && !inCombatMode) {
+                    // Right-click to cast the fishing rod
+                    if (client.interactionManager != null && isFishingRod(client.player.getMainHandStack())) {
+                        client.interactionManager.interactItem(client.player, Hand.MAIN_HAND);
+                    }
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }).start();
+    }
+
+    private static boolean isFishingRod(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) return false;
+
+        String itemName = stack.getItem().toString().toLowerCase();
+        String displayName = stack.getName().getString().toLowerCase();
+
+        return itemName.contains("fishing_rod") ||
+               displayName.contains("fishing rod") ||
+               displayName.contains("rod of the sea") ||
+               displayName.contains("auger rod") ||
+               displayName.contains("prismarine rod") ||
+               displayName.contains("winter rod") ||
+               displayName.contains("challenging rod") ||
+               displayName.contains("lucky rod") ||
+               displayName.contains("magma rod") ||
+               displayName.contains("lava rod") ||
+               displayName.contains("salty rod") ||
+               displayName.contains("rod of legends") ||
+               displayName.contains("rod of championing");
     }
 
     private static boolean isTargetSeaCreature(Entity entity) {
@@ -306,9 +539,8 @@ public class SeaCreatureKiller {
         targetEntity = null;
         killCount = 0;
         
-        if (currentMode != null) {
-            currentMode.exitCombat();
-        }
+        // Combat management is now handled centrally, no need to call mode.exitCombat()
+        exitCombat();
     }
 
     public static SeaCreatureKiller getInstance() {
@@ -321,5 +553,31 @@ public class SeaCreatureKiller {
     public static void init() {
         enabled = FishMasterConfig.isSeaCreatureKillerEnabled();
         updateMode();
+    }
+
+    private static void findNearestTargetCreature() {
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (client.player == null || client.world == null) return;
+
+        Vec3d playerPos = client.player.getPos();
+        Box searchBox = new Box(
+            playerPos.x - DETECTION_RANGE, playerPos.y - DETECTION_RANGE, playerPos.z - DETECTION_RANGE,
+            playerPos.x + DETECTION_RANGE, playerPos.y + DETECTION_RANGE, playerPos.z + DETECTION_RANGE
+        );
+
+        List<Entity> entities = client.world.getOtherEntities(client.player, searchBox, SeaCreatureKiller::isTargetSeaCreature);
+
+        Entity nearestCreature = null;
+        double nearestDistance = Double.MAX_VALUE;
+
+        for (Entity entity : entities) {
+            double distance = client.player.distanceTo(entity);
+            if (distance < nearestDistance && distance <= DETECTION_RANGE) {
+                nearestDistance = distance;
+                nearestCreature = entity;
+            }
+        }
+
+        targetEntity = nearestCreature;
     }
 }

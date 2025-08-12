@@ -26,12 +26,6 @@ public class AutoFishingFeature {
     // Debug mode variables
     private static boolean debugMode = false;
 
-    // Anti-AFK variables (without rotations)
-    private static boolean antiAfkEnabled = true; // Passive when mod starts
-    private static int antiAfkTimer = 0;
-    private static long lastAntiAfkAction = 0;
-    private static final java.util.Random random = new java.util.Random();
-
     // Failsafe variables
     private static long lastSuccessfulFish = System.currentTimeMillis();
     private static int consecutiveFailures = 0;
@@ -65,6 +59,17 @@ public class AutoFishingFeature {
     private static boolean playerPositionInitialized = false;
     private static final double MOVEMENT_THRESHOLD = 10.0; // Player moved more than 10 blocks
 
+    // --- Anti-AFK variables ---
+    private static float originalYaw = 0f;
+    private static float originalPitch = 0f;
+    private static boolean originalAnglesSet = false;
+    private static int antiAfkMoveCount = 0;
+    private static long lastAntiAfkMove = 0;
+    private static final long ANTI_AFK_INTERVAL_MS = 5000; // 5 seconds between moves
+    private static float targetYaw = 0f;
+    private static float targetPitch = 0f;
+    private static boolean returningToOriginal = false;
+
     private enum FishingState {
         IDLE,
         CASTING,
@@ -75,17 +80,6 @@ public class AutoFishingFeature {
 
     private static final long DETECTION_COOLDOWN = 50;
     private static final int BOBBER_SETTLE_TIME = 3;
-
-    // Anti-AFK constants
-    private static final int ANTI_AFK_INTERVAL = 200; // Move every 10 seconds (200 ticks)
-    private static final float CROSSHAIR_MOVEMENT_RANGE = 1.8f; // Further decreased movement range for more subtle anti-AFK
-
-    // Smooth anti-AFK transition variables
-    private static boolean isTransitioning = false;
-    private static float targetYaw = 0f;
-    private static float startYaw = 0f;
-    private static int transitionTicks = 0;
-    private static final int TRANSITION_DURATION = 60; // 3 seconds for smooth transition (60 ticks)
 
     static {
         // Initialize fishing events - but don't register keybindings here
@@ -101,11 +95,11 @@ public class AutoFishingFeature {
             stop();
             AutoFishingRenderer.reset();
             restoreMouseGrab();
-            // Keep fishing tracker always enabled - don't disable it
             emergencyStop = false;
-            // Deactivate sea creature killer when auto fishing stops
             SeaCreatureKiller.setAutoFishEnabled(false);
             sendDebugMessage("Auto fishing stopped - SCK disabled, tracker remains active");
+            // Reset anti-AFK original angles when disabling
+            originalAnglesSet = false;
         } else {
             sendDebugMessage("Starting auto fishing - performing pre-start checks");
             if (!performPreStartChecks()) {
@@ -116,18 +110,23 @@ public class AutoFishingFeature {
             sendDebugMessage("Pre-start checks passed - initializing systems");
             switchToFishingRod();
             ungrabMouse();
-            // Initialize anti-AFK when mod starts
-            initializeAntiAfk();
-            // Ensure fishing tracker is always enabled
             FishMasterConfig.setFishingTrackerEnabled(true);
             sessionStartTime = System.currentTimeMillis();
             lastSuccessfulFish = sessionStartTime;
             consecutiveFailures = 0;
             emergencyStop = false;
             serverConnectionLost = false;
-            // Enable sea creature killer availability when auto fishing starts
             SeaCreatureKiller.setAutoFishEnabled(true);
             sendDebugMessage("Auto fishing started - Session time: " + sessionStartTime + ", SCK enabled, tracker active");
+            // Set anti-AFK original angles exactly when enabling
+            MinecraftClient client = MinecraftClient.getInstance();
+            if (client.player != null) {
+                originalYaw = client.player.getYaw();
+                originalPitch = client.player.getPitch();
+                originalAnglesSet = true;
+                targetYaw = originalYaw;
+                targetPitch = originalPitch;
+            }
         }
 
         MinecraftClient client = MinecraftClient.getInstance();
@@ -182,17 +181,6 @@ public class AutoFishingFeature {
         sendDebugMessage("Pre-start checks passed - Player position initialized: (" + lastPlayerX + ", " + lastPlayerY + ", " + lastPlayerZ + ")");
 
         return true;
-    }
-
-    private static void initializeAntiAfk() {
-        MinecraftClient client = MinecraftClient.getInstance();
-        if (client.player != null) {
-            // Store original position
-            antiAfkEnabled = FishMasterConfig.isAntiAfkEnabled();
-            antiAfkTimer = 0;
-            lastAntiAfkAction = System.currentTimeMillis();
-            sendDebugMessage("Anti-AFK initialized - Enabled: " + antiAfkEnabled);
-        }
     }
 
     private static boolean hasValidFishingRod() {
@@ -291,9 +279,6 @@ public class AutoFishingFeature {
             stop();
             return;
         }
-
-        // Anti-AFK crosshair movement
-        handleAntiAfk(client);
 
         ItemStack mainHand = client.player.getStackInHand(Hand.MAIN_HAND);
         ItemStack offHand = client.player.getStackInHand(Hand.OFF_HAND);
@@ -394,7 +379,49 @@ public class AutoFishingFeature {
                 break;
         }
 
+        // Call anti-AFK logic
+        handleAntiAfk();
+
         // Session management failsafes removed - to be added later per user preference
+    }
+
+    // --- Anti-AFK logic ---
+    private static void handleAntiAfk() {
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (client.player == null) return;
+        long now = System.currentTimeMillis();
+        if (!originalAnglesSet) {
+            originalYaw = client.player.getYaw();
+            originalPitch = client.player.getPitch();
+            originalAnglesSet = true;
+            targetYaw = originalYaw;
+            targetPitch = originalPitch;
+        }
+        // Remove clamping of originalPitch here
+        if (now - lastAntiAfkMove > ANTI_AFK_INTERVAL_MS) {
+            lastAntiAfkMove = now;
+            antiAfkMoveCount++;
+            if (antiAfkMoveCount % 3 == 0) {
+                // Every 2 moves, return to original
+                targetYaw = originalYaw;
+                targetPitch = originalPitch;
+                returningToOriginal = true;
+            } else {
+                // Random small offset near original
+                targetYaw = originalYaw + (float)(Math.random() * 6.0 - 3.0); // -3 to +3 degrees
+                float pitchOffset = (float)(Math.random() * 2.0 - 1.0); // -1 to +1 degrees
+                // Clamp only the targetPitch, not originalPitch
+                targetPitch = Math.max(-80f, Math.min(80f, originalPitch + pitchOffset));
+                returningToOriginal = false;
+            }
+        }
+        // Smoothly interpolate to target
+        float currentYaw = client.player.getYaw();
+        float currentPitch = client.player.getPitch();
+        float newYaw = currentYaw + (targetYaw - currentYaw) * 0.2f;
+        float newPitch = currentPitch + (targetPitch - currentPitch) * 0.2f;
+        client.player.setYaw(newYaw);
+        client.player.setPitch(newPitch);
     }
 
     private static boolean performHealthCheck() {
@@ -527,8 +554,6 @@ public class AutoFishingFeature {
         delayTimer = 0;
         lastDetectionTime = 0;
         // Disable anti-AFK when stopping
-        antiAfkEnabled = false;
-        antiAfkTimer = 0;
         sendDebugMessage("Auto fishing stopped - Anti-AFK disabled");
     }
 
@@ -812,61 +837,6 @@ public class AutoFishingFeature {
         return false;
     }
 
-    private static void handleAntiAfk(MinecraftClient client) {
-        if (!antiAfkEnabled || client.player == null) return;
-
-        // Handle smooth transition if one is in progress
-        if (isTransitioning) {
-            transitionTicks++;
-            float progress = (float)transitionTicks / TRANSITION_DURATION;
-            
-            // Use smooth easing function for more natural movement
-            float easedProgress = (float)(1 - Math.cos(progress * Math.PI)) / 2; // Smooth cosine interpolation
-            
-            float newYaw = startYaw + (targetYaw - startYaw) * easedProgress;
-            client.player.setYaw(newYaw);
-            
-            if (transitionTicks >= TRANSITION_DURATION) {
-                // Transition complete
-                isTransitioning = false;
-                transitionTicks = 0;
-                client.player.setYaw(targetYaw); // Ensure we end at exact target
-                sendDebugMessage("Anti-AFK smooth transition complete - Final yaw: " + targetYaw);
-            }
-            return;
-        }
-
-        // Check if it's time to start a new anti-AFK movement
-        antiAfkTimer++;
-        if (antiAfkTimer >= ANTI_AFK_INTERVAL) {
-            antiAfkTimer = 0;
-
-            // Start a new smooth transition
-            try {
-                startYaw = client.player.getYaw();
-                
-                // Randomly choose direction and calculate target yaw
-                if (random.nextBoolean()) {
-                    targetYaw = startYaw + CROSSHAIR_MOVEMENT_RANGE;
-                } else {
-                    targetYaw = startYaw - CROSSHAIR_MOVEMENT_RANGE;
-                }
-                
-                // Normalize yaw to -180 to 180 range
-                while (targetYaw > 180f) targetYaw -= 360f;
-                while (targetYaw < -180f) targetYaw += 360f;
-                
-                // Start the smooth transition
-                isTransitioning = true;
-                transitionTicks = 0;
-                
-                sendDebugMessage("Starting anti-AFK smooth transition - From: " + startYaw + " to: " + targetYaw + " over " + TRANSITION_DURATION + " ticks");
-                
-            } catch (Exception e) {
-                sendDebugMessage("Error starting anti-AFK movement: " + e.getMessage());
-            }
-        }
-    }
 
     public static AutoFishingFeature getInstance() {
         if (instance == null) {

@@ -32,6 +32,7 @@ public class FishMasterConfig {
     private static boolean webhookEnabled = false;
     private static long healthCheckInterval = 300000; // 5 minutes in milliseconds
     private static String customMageWeapon = ""; // Custom mage weapon name for SCK
+    private static String customMeleeWeapon = ""; // Custom melee weapon name for SCK
     private static boolean seaCreatureKillerEnabled = false; // New field for SCK toggle from GUI
     private static String seaCreatureKillerMode = "RCM"; // Default mode
     private static int autoFishingKeybind = GLFW.GLFW_KEY_F; // Default to F key
@@ -78,6 +79,7 @@ public class FishMasterConfig {
                 webhookEnabled = config.webhookEnabled;
                 healthCheckInterval = config.healthCheckInterval > 0 ? config.healthCheckInterval : 300000;
                 customMageWeapon = config.customMageWeapon != null ? config.customMageWeapon : "";
+                customMeleeWeapon = config.customMeleeWeapon != null ? config.customMeleeWeapon : "";
                 seaCreatureKillerEnabled = config.seaCreatureKillerEnabled;
                 seaCreatureKillerMode = config.seaCreatureKillerMode != null ? config.seaCreatureKillerMode : "RCM";
                 autoFishingKeybind = config.autoFishingKeybind;
@@ -115,6 +117,7 @@ public class FishMasterConfig {
             configData.webhookEnabled = webhookEnabled;
             configData.healthCheckInterval = healthCheckInterval;
             configData.customMageWeapon = customMageWeapon;
+            configData.customMeleeWeapon = customMeleeWeapon;
             configData.seaCreatureKillerEnabled = seaCreatureKillerEnabled;
             configData.seaCreatureKillerMode = seaCreatureKillerMode;
             configData.autoFishingKeybind = autoFishingKeybind;
@@ -147,6 +150,7 @@ public class FishMasterConfig {
         public boolean webhookEnabled;
         public long healthCheckInterval;
         public String customMageWeapon;
+        public String customMeleeWeapon;
         public boolean seaCreatureKillerEnabled;
         public String seaCreatureKillerMode;
         public int autoFishingKeybind;
@@ -223,6 +227,10 @@ public class FishMasterConfig {
 
     public static String getCustomMageWeapon() {
         return customMageWeapon;
+    }
+
+    public static String getCustomMeleeWeapon() {
+        return customMeleeWeapon;
     }
 
     public static boolean isSeaCreatureKillerEnabled() {
@@ -329,6 +337,12 @@ public class FishMasterConfig {
         customMageWeapon = weapon != null ? weapon : "";
         save();
         System.out.println("[FishMaster] Custom mage weapon " + (customMageWeapon.isEmpty() ? "cleared" : "set to " + customMageWeapon));
+    }
+
+    public static void setCustomMeleeWeapon(String weapon) {
+        customMeleeWeapon = weapon != null ? weapon : "";
+        save();
+        System.out.println("[FishMaster] Custom melee weapon " + (customMeleeWeapon.isEmpty() ? "cleared" : "set to " + customMeleeWeapon));
     }
 
     public static void setSeaCreatureKillerEnabled(boolean enabled) {
