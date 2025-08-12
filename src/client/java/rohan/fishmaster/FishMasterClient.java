@@ -32,6 +32,9 @@ public class FishMasterClient implements ClientModInitializer {
             // Initialize keybindings FIRST - this is critical for preventing the crash
             KeyBindings.register();
 
+            // Initialize GUI-only keybind handler for auto-fishing
+            rohan.fishmaster.handler.GuiKeybindHandler.initialize();
+
             // Register the /fm command
             ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> {
                 FishMasterCommand.register(dispatcher);

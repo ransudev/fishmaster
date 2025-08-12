@@ -7,19 +7,13 @@ import org.lwjgl.glfw.GLFW;
 
 public class KeyBindings {
     // Static keybindings that appear in Minecraft's controls menu
-    public static KeyBinding TOGGLE_AUTO_FISHING;
+    // TOGGLE_AUTO_FISHING is now handled by GUI only, not registered with Minecraft
     public static KeyBinding EMERGENCY_STOP;
     public static KeyBinding TOGGLE_DEBUG;
-    public static KeyBinding TOGGLE_SEA_CREATURE_KILLER;
 
     public static void register() {
         // Create keybindings with default keys that will appear in Minecraft's controls
-        TOGGLE_AUTO_FISHING = new KeyBinding(
-            "key.fishmaster.toggle_auto_fishing",
-            InputUtil.Type.KEYSYM,
-            GLFW.GLFW_KEY_F, // Default to F key
-            "category.fishmaster.general"
-        );
+        // Note: TOGGLE_AUTO_FISHING is no longer registered here - it's GUI only
 
         EMERGENCY_STOP = new KeyBinding(
             "key.fishmaster.emergency_stop",
@@ -35,24 +29,13 @@ public class KeyBindings {
             "category.fishmaster.general"
         );
 
-        TOGGLE_SEA_CREATURE_KILLER = new KeyBinding(
-            "key.fishmaster.toggle_sea_creature_killer",
-            InputUtil.Type.KEYSYM,
-            GLFW.GLFW_KEY_G, // Default to G key
-            "category.fishmaster.combat"
-        );
-
-        // Register all keybindings with Minecraft
-        KeyBindingHelper.registerKeyBinding(TOGGLE_AUTO_FISHING);
+        // Register only emergency stop and debug keybindings with Minecraft
         KeyBindingHelper.registerKeyBinding(EMERGENCY_STOP);
         KeyBindingHelper.registerKeyBinding(TOGGLE_DEBUG);
-        KeyBindingHelper.registerKeyBinding(TOGGLE_SEA_CREATURE_KILLER);
     }
 
     public static void onKey() {
-        while (TOGGLE_AUTO_FISHING.wasPressed()) {
-            rohan.fishmaster.feature.AutoFishingFeature.toggle();
-        }
+        // TOGGLE_AUTO_FISHING is now handled by GUI only
 
         while (EMERGENCY_STOP.wasPressed()) {
             // Emergency stop functionality
@@ -61,10 +44,6 @@ public class KeyBindings {
 
         while (TOGGLE_DEBUG.wasPressed()) {
             rohan.fishmaster.feature.AutoFishingFeature.toggleDebugMode();
-        }
-
-        while (TOGGLE_SEA_CREATURE_KILLER.wasPressed()) {
-            rohan.fishmaster.feature.SeaCreatureKiller.toggle();
         }
     }
 }

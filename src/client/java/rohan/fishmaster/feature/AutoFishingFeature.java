@@ -819,13 +819,13 @@ public class AutoFishingFeature {
         if (isTransitioning) {
             transitionTicks++;
             float progress = (float)transitionTicks / TRANSITION_DURATION;
-
+            
             // Use smooth easing function for more natural movement
             float easedProgress = (float)(1 - Math.cos(progress * Math.PI)) / 2; // Smooth cosine interpolation
-
+            
             float newYaw = startYaw + (targetYaw - startYaw) * easedProgress;
             client.player.setYaw(newYaw);
-
+            
             if (transitionTicks >= TRANSITION_DURATION) {
                 // Transition complete
                 isTransitioning = false;
@@ -844,24 +844,24 @@ public class AutoFishingFeature {
             // Start a new smooth transition
             try {
                 startYaw = client.player.getYaw();
-
+                
                 // Randomly choose direction and calculate target yaw
                 if (random.nextBoolean()) {
                     targetYaw = startYaw + CROSSHAIR_MOVEMENT_RANGE;
                 } else {
                     targetYaw = startYaw - CROSSHAIR_MOVEMENT_RANGE;
                 }
-
+                
                 // Normalize yaw to -180 to 180 range
                 while (targetYaw > 180f) targetYaw -= 360f;
                 while (targetYaw < -180f) targetYaw += 360f;
-
+                
                 // Start the smooth transition
                 isTransitioning = true;
                 transitionTicks = 0;
-
+                
                 sendDebugMessage("Starting anti-AFK smooth transition - From: " + startYaw + " to: " + targetYaw + " over " + TRANSITION_DURATION + " ticks");
-
+                
             } catch (Exception e) {
                 sendDebugMessage("Error starting anti-AFK movement: " + e.getMessage());
             }

@@ -3,6 +3,7 @@ package rohan.fishmaster.config;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import net.fabricmc.loader.api.FabricLoader;
+import org.lwjgl.glfw.GLFW;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -31,6 +32,9 @@ public class FishMasterConfig {
     private static boolean webhookEnabled = false;
     private static long healthCheckInterval = 300000; // 5 minutes in milliseconds
     private static String customMageWeapon = ""; // Custom mage weapon name for SCK
+    private static boolean seaCreatureKillerEnabled = false; // New field for SCK toggle from GUI
+    private static String seaCreatureKillerMode = "RCM"; // Default mode
+    private static int autoFishingKeybind = GLFW.GLFW_KEY_F; // Default to F key
 
     // Default constructor for JSON serialization
     public FishMasterConfig() {
@@ -74,6 +78,9 @@ public class FishMasterConfig {
                 webhookEnabled = config.webhookEnabled;
                 healthCheckInterval = config.healthCheckInterval > 0 ? config.healthCheckInterval : 300000;
                 customMageWeapon = config.customMageWeapon != null ? config.customMageWeapon : "";
+                seaCreatureKillerEnabled = config.seaCreatureKillerEnabled;
+                seaCreatureKillerMode = config.seaCreatureKillerMode != null ? config.seaCreatureKillerMode : "RCM";
+                autoFishingKeybind = config.autoFishingKeybind;
             }
             System.out.println("[FishMaster] Config loaded successfully. Webhook URL: " + (webhookUrl.isEmpty() ? "Not set" : "Set"));
         } catch (Exception e) {
@@ -108,6 +115,9 @@ public class FishMasterConfig {
             configData.webhookEnabled = webhookEnabled;
             configData.healthCheckInterval = healthCheckInterval;
             configData.customMageWeapon = customMageWeapon;
+            configData.seaCreatureKillerEnabled = seaCreatureKillerEnabled;
+            configData.seaCreatureKillerMode = seaCreatureKillerMode;
+            configData.autoFishingKeybind = autoFishingKeybind;
 
             String json = GSON.toJson(configData);
             Files.writeString(CONFIG_PATH, json);
@@ -137,6 +147,9 @@ public class FishMasterConfig {
         public boolean webhookEnabled;
         public long healthCheckInterval;
         public String customMageWeapon;
+        public boolean seaCreatureKillerEnabled;
+        public String seaCreatureKillerMode;
+        public int autoFishingKeybind;
     }
 
     // Getters
@@ -210,6 +223,18 @@ public class FishMasterConfig {
 
     public static String getCustomMageWeapon() {
         return customMageWeapon;
+    }
+
+    public static boolean isSeaCreatureKillerEnabled() {
+        return seaCreatureKillerEnabled;
+    }
+
+    public static String getSeaCreatureKillerMode() {
+        return seaCreatureKillerMode;
+    }
+
+    public static int getAutoFishingKeybind() {
+        return autoFishingKeybind;
     }
 
     // Setters
@@ -304,6 +329,21 @@ public class FishMasterConfig {
         customMageWeapon = weapon != null ? weapon : "";
         save();
         System.out.println("[FishMaster] Custom mage weapon " + (customMageWeapon.isEmpty() ? "cleared" : "set to " + customMageWeapon));
+    }
+
+    public static void setSeaCreatureKillerEnabled(boolean enabled) {
+        seaCreatureKillerEnabled = enabled;
+        save();
+    }
+
+    public static void setSeaCreatureKillerMode(String mode) {
+        seaCreatureKillerMode = mode;
+        save();
+    }
+
+    public static void setAutoFishingKeybind(int keyCode) {
+        autoFishingKeybind = keyCode;
+        save();
     }
 
     public static void toggleFishingTracker() {

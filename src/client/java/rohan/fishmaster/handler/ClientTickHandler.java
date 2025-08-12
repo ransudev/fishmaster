@@ -53,19 +53,13 @@ public class ClientTickHandler {
     }
 
     private static void handleInputs() {
-        // Handle auto fishing toggle - use the correct keybinding from config package
-        if (KeyBindings.TOGGLE_AUTO_FISHING.wasPressed()) {
-            AutoFishingFeature.toggle();
-        }
+        // Auto fishing toggle is now handled by GUI only, not by keybind
 
         // Handle emergency stop
         if (KeyBindings.EMERGENCY_STOP.wasPressed()) {
             AutoFishingFeature.emergencyStop();
         }
 
-        // Handle sea creature killer toggle
-        if (KeyBindings.TOGGLE_SEA_CREATURE_KILLER.wasPressed()) {
-            SeaCreatureKiller.toggle();
-        }
+        // Sea Creature Killer toggle is now handled via GUI instead of keybinding
     }
 }
