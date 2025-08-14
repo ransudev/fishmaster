@@ -1,7 +1,17 @@
 plugins {
     id 'fabric-loom' version '1.10.5'
     id 'maven-publish'
-    id 'org.jetbrains.kotlin.jvm' version '2.0.21'
+    // Align with fabric-language-kotlin 1.13.2+kotlin.2.1.20
+    id 'org.jetbrains.kotlin.jvm' version '2.1.20'
+}
+
+// Avoid failures due to duplicate resources like lang JSONs when building source jars or processing resources
+tasks.withType(Jar).configureEach { t ->
+    t.duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+tasks.withType(Copy).configureEach { t ->
+    t.duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
 
 version = project.mod_version
@@ -38,6 +48,26 @@ loom {
 		}
 	}
 }
+
+// Ensure client source set includes both Java and Kotlin and compile order allows Kotlin to see Java
+sourceSets {
+    client {
+        java.srcDirs += ["src/client/java"]
+        resources.srcDirs += ["src/client/resources"]
+    }
+}
+
+// Configure Kotlin source dir for the custom 'client' source set
+kotlin {
+    sourceSets {
+        client {
+            kotlin.srcDirs += ["src/client/kotlin"]
+        }
+    }
+}
+
+// Make sure client Kotlin compiles after client Java so mixed interop works reliably
+
 
 dependencies {
 	// To change the versions see the gradle.properties file
@@ -94,7 +124,7 @@ tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
         jvmTarget = "21"
         freeCompilerArgs = freeCompilerArgs + [
             "-Xjsr305=strict",
-            "-Xopt-in=kotlin.RequiresOptIn"
+            "-opt-in=kotlin.RequiresOptIn"
         ]
     }
 }

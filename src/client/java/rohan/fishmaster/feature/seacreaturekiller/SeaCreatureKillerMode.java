@@ -120,6 +120,6 @@ public abstract class SeaCreatureKillerMode {
                displayName.contains("lava rod") ||
                displayName.contains("salty rod") ||
                displayName.contains("rod of legends") ||
-               displayName.contains("rod of championing");
+               displayName.contains("rod of champions");
     }
 }

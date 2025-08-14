@@ -57,6 +57,14 @@ public class FishMasterCommand {
         dispatcher.register(ClientCommandManager.literal("clearmageweapon")
             .executes(FishMasterCommand::clearMageWeapon));
 
+        // Register setmeleeweapon command
+        dispatcher.register(ClientCommandManager.literal("setmeleeweapon")
+            .executes(FishMasterCommand::setMeleeWeapon));
+
+        // Register clearmeleeweapon command
+        dispatcher.register(ClientCommandManager.literal("clearmeleeweapon")
+            .executes(FishMasterCommand::clearMeleeWeapon));
+
         // Register performance monitoring command
         dispatcher.register(ClientCommandManager.literal("fmperf")
             .executes(FishMasterCommand::showPerformanceStats));
@@ -68,6 +76,49 @@ public class FishMasterCommand {
         TickScheduler.schedule(() -> {
             MinecraftClient.getInstance().setScreen(new FishmasterScreen());
         });
+
+        return 1;
+    }
+
+    private static int setMeleeWeapon(CommandContext<FabricClientCommandSource> context) {
+        MinecraftClient client = MinecraftClient.getInstance();
+
+        if (client.player == null) {
+            return 0;
+        }
+
+        ItemStack heldItem = client.player.getMainHandStack();
+
+        if (heldItem.isEmpty()) {
+            client.player.sendMessage(
+                Text.literal("[FishMaster] ").formatted(Formatting.AQUA)
+                    .append(Text.literal("Hold the item you want to use as a melee weapon!").formatted(Formatting.RED)), false);
+            return 0;
+        }
+
+        String weaponName = heldItem.getName().getString();
+        FishMasterConfig.setCustomMeleeWeapon(weaponName);
+
+        client.player.sendMessage(
+            Text.literal("[FishMaster] ").formatted(Formatting.AQUA)
+                .append(Text.literal("Custom melee weapon set to: ")
+                    .append(Text.literal(weaponName).formatted(Formatting.YELLOW))), false);
+
+        return 1;
+    }
+
+    private static int clearMeleeWeapon(CommandContext<FabricClientCommandSource> context) {
+        MinecraftClient client = MinecraftClient.getInstance();
+
+        if (client.player == null) {
+            return 0;
+        }
+
+        FishMasterConfig.setCustomMeleeWeapon("");
+
+        client.player.sendMessage(
+            Text.literal("[FishMaster] ").formatted(Formatting.AQUA)
+                .append(Text.literal("Custom melee weapon cleared! SCK will not use any melee weapon until you set one.").formatted(Formatting.YELLOW)), false);
 
         return 1;
     }

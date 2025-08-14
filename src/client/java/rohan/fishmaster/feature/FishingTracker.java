@@ -5,6 +5,7 @@ import net.minecraft.entity.projectile.FishingBobberEntity;
 import net.minecraft.item.Items;
 import rohan.fishmaster.config.FishMasterConfig;
 import rohan.fishmaster.data.FishingData;
+import rohan.fishmaster.feature.SeaCreatureKiller;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -13,6 +14,8 @@ public class FishingTracker {
     public static final Map<String, String> seaCreatureMessages = new HashMap<>();
     private static final Map<String, Integer> mobsCaught = new HashMap<>();
     private static final Map<String, Double> lastTimeCaught = new HashMap<>();
+    // Map aliases from chat to canonical target names in SeaCreatureKiller
+    private static final Map<String, String> aliasToCanonical = new HashMap<>();
     private static final MinecraftClient mc = MinecraftClient.getInstance();
 
     static {
@@ -20,15 +23,16 @@ public class FishingTracker {
     }
 
     private static void initializeSeaCreatures() {
-        // Initialize sea creature messages
+        // Initialize sea creature messages (chat -> detected name)
         seaCreatureMessages.put("A Squid appeared.", "Squid");
         seaCreatureMessages.put("You caught a Sea Walker.", "Sea Walker");
         seaCreatureMessages.put("You stumbled upon a Sea Guardian.", "Sea Guardian");
         seaCreatureMessages.put("It looks like you've disrupted the Sea Witch's brewing session. Watch out, she's furious!", "Sea Witch");
         seaCreatureMessages.put("You reeled in a Sea Archer.", "Sea Archer");
-        seaCreatureMessages.put("The Rider of the Deep has emerged.", "Rider Of The Deep");
+        seaCreatureMessages.put("The Rider of the Deep has emerged.", "Rider of the Deep");
         seaCreatureMessages.put("Huh? A Catfish!", "Catfish");
         seaCreatureMessages.put("Is this even a fish? It's the Carrot King!", "Carrot King");
+        // Agarimoo appears via fishing in some contexts
         seaCreatureMessages.put("Gross! A Sea Leech!", "Sea Leech");
         seaCreatureMessages.put("You've discovered a Guardian Defender of the sea.", "Guardian Defender");
         seaCreatureMessages.put("You have awoken the Deep Sea Protector, prepare for a battle!", "Deep Sea Protector");
@@ -40,7 +44,7 @@ public class FishingTracker {
         seaCreatureMessages.put("The spirit of a long lost Phantom Fisher has come to haunt you.", "Phantom Fisher");
         seaCreatureMessages.put("This can't be! The manifestation of death himself!", "Grim Reaper");
         seaCreatureMessages.put("Frozen Steve fell into the pond long ago, never to resurface...until now!", "Frozen Steve");
-        seaCreatureMessages.put("It's a snowman! He looks harmless", "Frosty The Snowman");
+        seaCreatureMessages.put("It's a snowman! He looks harmless", "Frosty");
         seaCreatureMessages.put("The Grinch stole Jerry's Gifts...get them back!", "Grinch");
         seaCreatureMessages.put("What is this creature!?", "Yeti");
         seaCreatureMessages.put("You found a forgotten Nutcracker laying beneath the ice.", "Nutcracker");
@@ -65,6 +69,10 @@ public class FishingTracker {
         seaCreatureMessages.put("A Lava Blaze has surfaced from the depths!", "Lava Blaze");
         seaCreatureMessages.put("A Lava Pigman arose from the depths!", "Lava Pigman");
 
+        // Build alias map to canonical names present in SeaCreatureKiller
+        aliasToCanonical.put("Frosty The Snowman", "Frosty");
+        aliasToCanonical.put("Rider Of The Deep", "Rider of the Deep");
+
         // Load saved data from FishingData
         if (FishingData.getMobsCaught() != null) {
             mobsCaught.putAll(FishingData.getMobsCaught());
@@ -77,8 +85,12 @@ public class FishingTracker {
     public static void onChatMessage(String message) {
         for (Map.Entry<String, String> mobMessage : seaCreatureMessages.entrySet()) {
             if (message.startsWith(mobMessage.getKey())) {
-                String mobName = mobMessage.getValue();
-                updateMobCatch(mobName);
+                String derived = mobMessage.getValue();
+                String canonical = aliasToCanonical.getOrDefault(derived, derived);
+                // Only track if this is a configured target creature
+                if (SeaCreatureKiller.isTargetCreature(canonical)) {
+                    updateMobCatch(canonical);
+                }
                 break;
             }
         }

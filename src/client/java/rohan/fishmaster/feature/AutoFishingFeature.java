@@ -379,49 +379,15 @@ public class AutoFishingFeature {
                 break;
         }
 
-        // Call anti-AFK logic
-        handleAntiAfk();
+        // Anti-AFK disabled per user request
+        // handleAntiAfk();
 
         // Session management failsafes removed - to be added later per user preference
     }
 
     // --- Anti-AFK logic ---
     private static void handleAntiAfk() {
-        MinecraftClient client = MinecraftClient.getInstance();
-        if (client.player == null) return;
-        long now = System.currentTimeMillis();
-        if (!originalAnglesSet) {
-            originalYaw = client.player.getYaw();
-            originalPitch = client.player.getPitch();
-            originalAnglesSet = true;
-            targetYaw = originalYaw;
-            targetPitch = originalPitch;
-        }
-        // Remove clamping of originalPitch here
-        if (now - lastAntiAfkMove > ANTI_AFK_INTERVAL_MS) {
-            lastAntiAfkMove = now;
-            antiAfkMoveCount++;
-            if (antiAfkMoveCount % 3 == 0) {
-                // Every 2 moves, return to original
-                targetYaw = originalYaw;
-                targetPitch = originalPitch;
-                returningToOriginal = true;
-            } else {
-                // Random small offset near original
-                targetYaw = originalYaw + (float)(Math.random() * 6.0 - 3.0); // -3 to +3 degrees
-                float pitchOffset = (float)(Math.random() * 2.0 - 1.0); // -1 to +1 degrees
-                // Clamp only the targetPitch, not originalPitch
-                targetPitch = Math.max(-80f, Math.min(80f, originalPitch + pitchOffset));
-                returningToOriginal = false;
-            }
-        }
-        // Smoothly interpolate to target
-        float currentYaw = client.player.getYaw();
-        float currentPitch = client.player.getPitch();
-        float newYaw = currentYaw + (targetYaw - currentYaw) * 0.2f;
-        float newPitch = currentPitch + (targetPitch - currentPitch) * 0.2f;
-        client.player.setYaw(newYaw);
-        client.player.setPitch(newPitch);
+        // Disabled: no-op
     }
 
     private static boolean performHealthCheck() {

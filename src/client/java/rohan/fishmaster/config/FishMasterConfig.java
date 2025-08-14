@@ -9,6 +9,8 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
+import static rohan.fishmaster.data.FishingData.save;
+
 public class FishMasterConfig {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final Path CONFIG_PATH = FabricLoader.getInstance().getConfigDir().resolve("fishmaster").resolve("config.json");
@@ -33,9 +35,9 @@ public class FishMasterConfig {
     private static long healthCheckInterval = 300000; // 5 minutes in milliseconds
     private static String customMageWeapon = ""; // Custom mage weapon name for SCK
     private static String customMeleeWeapon = ""; // Custom melee weapon name for SCK
-    private static boolean seaCreatureKillerEnabled = false; // New field for SCK toggle from GUI
-    private static String seaCreatureKillerMode = "RCM"; // Default mode
-    private static int autoFishingKeybind = GLFW.GLFW_KEY_F; // Default to F key
+    private static boolean seaCreatureKillerEnabled = false;
+    private static String seaCreatureKillerMode = "default";
+    private static int autoFishingKeybind = GLFW.GLFW_KEY_UNKNOWN;
 
     // Default constructor for JSON serialization
     public FishMasterConfig() {
@@ -81,7 +83,7 @@ public class FishMasterConfig {
                 customMageWeapon = config.customMageWeapon != null ? config.customMageWeapon : "";
                 customMeleeWeapon = config.customMeleeWeapon != null ? config.customMeleeWeapon : "";
                 seaCreatureKillerEnabled = config.seaCreatureKillerEnabled;
-                seaCreatureKillerMode = config.seaCreatureKillerMode != null ? config.seaCreatureKillerMode : "RCM";
+                seaCreatureKillerMode = config.seaCreatureKillerMode != null ? config.seaCreatureKillerMode : "default";
                 autoFishingKeybind = config.autoFishingKeybind;
             }
             System.out.println("[FishMaster] Config loaded successfully. Webhook URL: " + (webhookUrl.isEmpty() ? "Not set" : "Set"));
@@ -156,107 +158,32 @@ public class FishMasterConfig {
         public int autoFishingKeybind;
     }
 
-    // Getters
-    public static boolean isFishingTrackerEnabled() {
-        return fishingTrackerEnabled;
-    }
-
-    public static boolean isFishingTrackerSpookyEnabled() {
-        return fishingTrackerSpookyEnabled;
-    }
-
-    public static boolean isFishingTrackerMarinaEnabled() {
-        return fishingTrackerMarinaEnabled;
-    }
-
-    public static boolean isFishingTrackerWinterEnabled() {
-        return fishingTrackerWinterEnabled;
-    }
-
-    public static boolean isFishingTrackerTimeSinceEnabled() {
-        return fishingTrackerTimeSinceEnabled;
-    }
-
-    public static boolean isAutoDetectFishingTypeEnabled() {
-        return autoDetectFishingTypeEnabled;
-    }
-
-    public static int getFishingTrackerType() {
-        return fishingTrackerType;
-    }
-
-    public static boolean isAntiAfkEnabled() {
-        return antiAfkEnabled;
-    }
-
-    public static long getMaxSessionTime() {
-        return maxSessionTime;
-    }
-
-    public static long getMaxIdleTime() {
-        return maxIdleTime;
-    }
-
-    public static int getMaxConsecutiveFailures() {
-        return maxConsecutiveFailures;
-    }
-
-    public static boolean isHealthChecksEnabled() {
-        return enableHealthChecks;
-    }
-
-    public static float getMinHealthThreshold() {
-        return minHealthThreshold;
-    }
-
-    public static boolean isPauseOnPlayerMovementEnabled() {
-        return pauseOnPlayerMovement;
-    }
-
-    public static String getWebhookUrl() {
-        return webhookUrl;
-    }
-
-    public static boolean isWebhookEnabled() {
-        return webhookEnabled;
-    }
-
-    public static long getHealthCheckInterval() {
-        return healthCheckInterval;
-    }
-
-    public static String getCustomMageWeapon() {
-        return customMageWeapon;
-    }
-
-    public static String getCustomMeleeWeapon() {
-        return customMeleeWeapon;
-    }
-
-    public static boolean isSeaCreatureKillerEnabled() {
-        return seaCreatureKillerEnabled;
-    }
-
-    public static String getSeaCreatureKillerMode() {
-        return seaCreatureKillerMode;
-    }
-
-    public static int getAutoFishingKeybind() {
-        return autoFishingKeybind;
-    }
-
-    // Setters
-    public static void setFishingTrackerEnabled(boolean enabled) {
-        fishingTrackerEnabled = enabled;
-        save();
-    }
+    // Getters and setters for config fields
+    public static boolean isFishingTrackerEnabled() { return fishingTrackerEnabled; }
+    public static boolean isFishingTrackerSpookyEnabled() { return fishingTrackerSpookyEnabled; }
+    public static boolean isFishingTrackerMarinaEnabled() { return fishingTrackerMarinaEnabled; }
+    public static boolean isFishingTrackerWinterEnabled() { return fishingTrackerWinterEnabled; }
+    public static boolean isFishingTrackerTimeSinceEnabled() { return fishingTrackerTimeSinceEnabled; }
+    public static boolean isAutoDetectFishingTypeEnabled() { return autoDetectFishingTypeEnabled; }
+    public static int getFishingTrackerType() { return fishingTrackerType; }
+    public static boolean isAntiAfkEnabled() { return antiAfkEnabled; }
+    public static long getMaxSessionTime() { return maxSessionTime; }
+    public static long getMaxIdleTime() { return maxIdleTime; }
+    public static int getMaxConsecutiveFailures() { return maxConsecutiveFailures; }
+    public static boolean isHealthChecksEnabled() { return enableHealthChecks; }
+    public static float getMinHealthThreshold() { return minHealthThreshold; }
+    public static boolean isPauseOnPlayerMovementEnabled() { return pauseOnPlayerMovement; }
+    public static String getWebhookUrl() { return webhookUrl; }
+    public static boolean isWebhookEnabled() { return webhookEnabled; }
+    public static long getHealthCheckInterval() { return healthCheckInterval; }
+    public static String getCustomMageWeapon() { return customMageWeapon; }
+    public static String getCustomMeleeWeapon() { return customMeleeWeapon; }
+    public static boolean isSeaCreatureKillerEnabled() { return seaCreatureKillerEnabled; }
+    public static String getSeaCreatureKillerMode() { return seaCreatureKillerMode; }
+    public static int getAutoFishingKeybind() { return autoFishingKeybind; }
 
     public static void setFishingTrackerSpookyEnabled(boolean enabled) {
         fishingTrackerSpookyEnabled = enabled;
-        save();
-    }
-
-    public static void setFishingTrackerMarinaEnabled(boolean enabled) {
         fishingTrackerMarinaEnabled = enabled;
         save();
     }
@@ -355,13 +282,10 @@ public class FishMasterConfig {
         save();
     }
 
-    public static void setAutoFishingKeybind(int keyCode) {
-        autoFishingKeybind = keyCode;
+    public static void setFishingTrackerEnabled(boolean enabled) {
+        fishingTrackerEnabled = enabled;
         save();
     }
 
-    public static void toggleFishingTracker() {
-        fishingTrackerEnabled = !fishingTrackerEnabled;
-        save();
-    }
+    // Deprecated placeholder removed; use getter above
 }

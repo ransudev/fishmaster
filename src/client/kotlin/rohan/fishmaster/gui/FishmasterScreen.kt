@@ -11,12 +11,56 @@ import gg.essential.elementa.constraints.animation.Animations
 import gg.essential.elementa.dsl.*
 import gg.essential.elementa.effects.OutlineEffect
 import org.lwjgl.glfw.GLFW
-import rohan.fishmaster.config.FishMasterConfig
 import rohan.fishmaster.feature.SeaCreatureKiller
 import java.awt.Color
 import net.minecraft.client.MinecraftClient
 import net.minecraft.text.Text
 import net.minecraft.util.Formatting
+
+// Note: Using real config from rohan.fishmaster.config.FishMasterConfig
+
+// Bridge to access Java config statics without Kotlin compile-time dependency on the client Java task order
+private object ConfigBridge {
+    private const val CLASS_NAME = "rohan.fishmaster.config.FishMasterConfig"
+
+    private fun clazz(): Class<*>? = try {
+        Class.forName(CLASS_NAME)
+    } catch (_: Throwable) { null }
+
+    fun getAutoFishingKeybind(): Int = try {
+        val c = clazz() ?: return org.lwjgl.glfw.GLFW.GLFW_KEY_UNKNOWN
+        val m = c.getMethod("getAutoFishingKeybind")
+        (m.invoke(null) as? Int) ?: org.lwjgl.glfw.GLFW.GLFW_KEY_UNKNOWN
+    } catch (_: Throwable) { org.lwjgl.glfw.GLFW.GLFW_KEY_UNKNOWN }
+
+    fun setAutoFishingKeybind(key: Int) {
+        try {
+            val c = clazz() ?: return
+            val m = c.getMethod("setAutoFishingKeybind", Int::class.javaPrimitiveType)
+            m.invoke(null, key)
+        } catch (_: Throwable) { }
+    }
+
+    fun isSeaCreatureKillerEnabled(): Boolean = try {
+        val c = clazz() ?: return false
+        val m = c.getMethod("isSeaCreatureKillerEnabled")
+        (m.invoke(null) as? Boolean) ?: false
+    } catch (_: Throwable) { false }
+
+    fun getSeaCreatureKillerMode(): String = try {
+        val c = clazz() ?: return "RCM"
+        val m = c.getMethod("getSeaCreatureKillerMode")
+        (m.invoke(null) as? String) ?: "RCM"
+    } catch (_: Throwable) { "RCM" }
+
+    fun setSeaCreatureKillerMode(mode: String) {
+        try {
+            val c = clazz() ?: return
+            val m = c.getMethod("setSeaCreatureKillerMode", String::class.java)
+            m.invoke(null, mode)
+        } catch (_: Throwable) { }
+    }
+}
 
 class SimpleDropdown(
     private val options: List<String>,
@@ -31,8 +75,8 @@ class SimpleDropdown(
 
     init {
         constrain {
-            width = 80.pixels()
-            height = 16.pixels()
+            width = 120.pixels()
+            height = 24.pixels()
         }
 
         mainBox = UIBlock().constrain {
@@ -45,7 +89,7 @@ class SimpleDropdown(
         selectedText = UIText(selectedOption).constrain {
             x = CenterConstraint()
             y = CenterConstraint()
-            textScale = 0.7f.pixels()
+            textScale = 1.0f.pixels()
             color = Color(185, 187, 190).toConstraint()
         } childOf mainBox
 
@@ -61,7 +105,7 @@ class SimpleDropdown(
             val optionBox = UIContainer().constrain {
                 y = SiblingConstraint()
                 width = 100.percent()
-                height = 16.pixels()
+                height = 24.pixels()
             } childOf optionsContainer
 
             val optionBackground = UIBlock().constrain {
@@ -74,7 +118,7 @@ class SimpleDropdown(
             val optionText = UIText(option).constrain {
                 x = CenterConstraint()
                 y = CenterConstraint()
-                textScale = 0.7f.pixels()
+                textScale = 1.0f.pixels()
                 color = Color(185, 187, 190).toConstraint()
             } childOf optionBox
 
@@ -90,13 +134,17 @@ class SimpleDropdown(
                     setColorAnimation(Animations.OUT_EXP, 0.5f, Color(70, 70, 70).toConstraint())
                 }
             }
-            optionBox.onMouseClick {
+            fun selectOption() {
                 selectedOption = option
                 selectedText.setText(option)
-                onSelect(option)
-                optionsContainer.hide(true) // Ensure dropdown closes
-                expanded = false // Ensure state is correct
+                onSelect(option) // Always call onSelect
+                optionsContainer.hide(true)
+                expanded = false
             }
+            optionBox.onMouseClick {
+                selectOption()
+            }
+            optionBackground.onMouseClick { selectOption() }
         }
 
         mainBox.onMouseClick {
@@ -126,6 +174,56 @@ class SimpleDropdown(
     }
 }
 
+// Temporary replacement for dropdown: a single button that cycles through options on click
+class SimpleCycleButton(
+    private val options: List<String>,
+    initialSelection: String,
+    private val onChange: (String) -> Unit
+) : UIComponent() {
+    private var index = options.indexOf(initialSelection).let { if (it == -1) 0 else it }
+    private val background: UIComponent
+    private val text: UIText
+
+    init {
+        constrain {
+            width = 120.pixels()
+            height = 24.pixels()
+        }
+
+        background = UIBlock().constrain {
+            width = 100.percent()
+            height = 100.percent()
+            color = Color(70, 70, 70).toConstraint()
+        }.setRadius(3f.pixels()) childOf this
+        background.effect(OutlineEffect(Color.BLACK, 1f))
+
+        text = UIText(options[index]).constrain {
+            x = CenterConstraint()
+            y = CenterConstraint()
+            textScale = 1.0f.pixels()
+            color = Color(185, 187, 190).toConstraint()
+        } childOf this
+
+        onMouseClick {
+            index = (index + 1) % options.size
+            val value = options[index]
+            text.setText(value)
+            onChange(value)
+        }
+
+        onMouseEnter {
+            background.animate {
+                setColorAnimation(Animations.OUT_EXP, 0.5f, Color(90, 90, 90).toConstraint())
+            }
+        }
+        onMouseLeave {
+            background.animate {
+                setColorAnimation(Animations.OUT_EXP, 0.5f, Color(70, 70, 70).toConstraint())
+            }
+        }
+    }
+}
+
 class SimpleSwitch(initialState: Boolean) : UIComponent() {
     private var enabled = initialState
     val text = UIText(if (enabled) "ON" else "OFF")
@@ -135,8 +233,8 @@ class SimpleSwitch(initialState: Boolean) : UIComponent() {
 
     init {
         constrain {
-            width = 30.pixels()
-            height = 15.pixels()
+            width = 45.pixels()
+            height = 22.5f.pixels()
         }
 
         background = UIBlock().constrain {
@@ -149,7 +247,7 @@ class SimpleSwitch(initialState: Boolean) : UIComponent() {
         text.constrain {
             x = CenterConstraint()
             y = CenterConstraint()
-            textScale = 0.6f.pixels()
+            textScale = 0.9f.pixels()
         } childOf this
 
         updateColor()
@@ -180,15 +278,15 @@ class SimpleSwitch(initialState: Boolean) : UIComponent() {
     }
 }
 
-class SimpleKeybindButton(initialKey: Int, private val onKeySet: (Int) -> Unit) : UIComponent() {
+class SimpleKeybindButton(private val getKey: () -> Int, private val onKeySet: (Int) -> Unit) : UIComponent() {
     private var waitingForKey = false
     private val keyText: UIText
     private val background: UIComponent
 
     init {
         constrain {
-            width = 60.pixels()
-            height = 16.pixels()
+            width = 90.pixels()
+            height = 24.pixels()
         }
 
         background = UIBlock().constrain {
@@ -198,10 +296,10 @@ class SimpleKeybindButton(initialKey: Int, private val onKeySet: (Int) -> Unit) 
         }.setRadius(3f.pixels()) childOf this
         background.effect(OutlineEffect(Color.BLACK, 1f))
 
-        keyText = UIText(getKeyName(initialKey)).constrain {
+        keyText = UIText(getKeyName(getKey())).constrain {
             x = CenterConstraint()
             y = CenterConstraint()
-            textScale = 0.7f.pixels()
+            textScale = 1.0f.pixels()
         } childOf this
 
         updateColor()
@@ -227,7 +325,27 @@ class SimpleKeybindButton(initialKey: Int, private val onKeySet: (Int) -> Unit) 
         }
     }
 
-    private fun getKeyName(key: Int) = if (key == GLFW.GLFW_KEY_UNKNOWN) "None" else GLFW.glfwGetKeyName(key, 0) ?: "Unknown"
+    private fun getKeyName(key: Int): String {
+        if (key == GLFW.GLFW_KEY_UNKNOWN) return "None"
+        val name = GLFW.glfwGetKeyName(key, 0)
+        if (name != null) return name.uppercase()
+        // Fallback for special keys
+        return when (key) {
+            GLFW.GLFW_KEY_SPACE -> "SPACE"
+            GLFW.GLFW_KEY_LEFT_SHIFT, GLFW.GLFW_KEY_RIGHT_SHIFT -> "SHIFT"
+            GLFW.GLFW_KEY_LEFT_CONTROL, GLFW.GLFW_KEY_RIGHT_CONTROL -> "CTRL"
+            GLFW.GLFW_KEY_LEFT_ALT, GLFW.GLFW_KEY_RIGHT_ALT -> "ALT"
+            GLFW.GLFW_KEY_TAB -> "TAB"
+            GLFW.GLFW_KEY_ENTER -> "ENTER"
+            GLFW.GLFW_KEY_BACKSPACE -> "BACKSPACE"
+            GLFW.GLFW_KEY_DELETE -> "DELETE"
+            GLFW.GLFW_KEY_UP -> "UP"
+            GLFW.GLFW_KEY_DOWN -> "DOWN"
+            GLFW.GLFW_KEY_LEFT -> "LEFT"
+            GLFW.GLFW_KEY_RIGHT -> "RIGHT"
+            else -> "Unknown"
+        }
+    }
 
     private fun updateColor() {
         val textColor = if (waitingForKey) Color(114, 137, 218) else Color(185, 187, 190)
@@ -239,7 +357,7 @@ class SimpleKeybindButton(initialKey: Int, private val onKeySet: (Int) -> Unit) 
             val finalKeyCode = if (keyCode == GLFW.GLFW_KEY_ESCAPE) GLFW.GLFW_KEY_UNKNOWN else keyCode
             waitingForKey = false
             onKeySet(finalKeyCode)
-            keyText.setText(getKeyName(finalKeyCode))
+            keyText.setText(getKeyName(getKey())) // Always show the latest key from config
             updateColor()
         }
     }
@@ -248,7 +366,8 @@ class SimpleKeybindButton(initialKey: Int, private val onKeySet: (Int) -> Unit) 
 }
 
 class FishmasterScreen : WindowScreen(ElementaVersion.V5) {
-    private val tabs = listOf("Main", "Misc", "Failsafes", "Webhook")
+    private var previousGuiScale: Int? = null
+    private val tabs = listOf("Main", "Misc", "Failsafes", "Extras")
     private var selectedTab = tabs.first()
     private val contentContainer: UIComponent
     private val tabsComponents = mutableMapOf<String, UIComponent>()
@@ -256,18 +375,23 @@ class FishmasterScreen : WindowScreen(ElementaVersion.V5) {
     private val selectedTabUnderline: UIComponent
 
     init {
+        // Save the previous GUI scale
+        previousGuiScale = MinecraftClient.getInstance().options.guiScale.value
+        // Force GUI scale to 2x
+        MinecraftClient.getInstance().options.guiScale.setValue(2)
+
         val mainContainer = UIContainer().constrain {
             x = CenterConstraint()
             y = CenterConstraint()
-            width = 500.pixels()
-            height = 350.pixels()
+            width = 600.pixels()
+            height = 400.pixels()
         } childOf window
 
         val background = UIBlock().constrain {
             width = 100.percent()
             height = 100.percent()
             color = Color(45, 45, 45).toConstraint()
-        }.setRadius(10f.pixels()) childOf mainContainer
+        }.setRadius(10.pixels()) childOf mainContainer
         background.effect(OutlineEffect(Color.BLACK, 2f))
 
         // Header
@@ -282,7 +406,7 @@ class FishmasterScreen : WindowScreen(ElementaVersion.V5) {
             width = 100.percent()
             height = 100.percent()
             color = Color(60, 60, 60).toConstraint()
-        }.setRadius(10f.pixels()) childOf header
+        }.setRadius(10.pixels()) childOf header
         headerBackground.effect(OutlineEffect(Color.BLACK, 1f))
 
         val title = UIText("FishMaster").constrain {
@@ -293,7 +417,7 @@ class FishmasterScreen : WindowScreen(ElementaVersion.V5) {
         } childOf header
 
         val closeButton = UIContainer().constrain {
-            x = RelativeConstraint(1f) - 25.pixels()
+            x = RelativeConstraint(1f) - 30.pixels()
             y = CenterConstraint()
             width = 20.pixels()
             height = 20.pixels()
@@ -341,18 +465,18 @@ class FishmasterScreen : WindowScreen(ElementaVersion.V5) {
 
         selectedTabUnderline = UIBlock().constrain {
             x = 0.pixels()
-            y = 100.percent() - 2.pixels()
-            width = 70.pixels()
-            height = 2.pixels()
+            y = 100.percent() - 3.pixels()
+            width = 90.pixels()
+            height = 3.pixels()
             color = Color(88, 101, 242).toConstraint()
         } childOf tabsContainer
 
         // Create tabs
         tabs.forEachIndexed { index, tab ->
             val tabButton = UIContainer().constrain {
-                x = (index * 70).pixels()
+                x = (index * 90).pixels()
                 y = 0.pixels()
-                width = 70.pixels()
+                width = 90.pixels()
                 height = 100.percent()
             } childOf tabsContainer
             tabsComponents[tab] = tabButton
@@ -406,7 +530,7 @@ class FishmasterScreen : WindowScreen(ElementaVersion.V5) {
             }
         }
 
-        val targetX = (selectedIndex * 70).toFloat()
+        val targetX = (selectedIndex * 90)
         selectedTabUnderline.animate {
             setXAnimation(Animations.OUT_EXP, 0.3f, targetX.pixels())
         }
@@ -418,102 +542,98 @@ class FishmasterScreen : WindowScreen(ElementaVersion.V5) {
 
     private fun showTab(tab: String) {
         contentContainer.clearChildren()
-        keybindButton = null // Reset keybind button on tab change
+        // Only reset keybindButton if not on Main tab
+        if (tab != "Main") keybindButton = null
 
         when (tab) {
             "Main" -> {
-                val keybindRow = UIContainer().constrain {
-                    y = 10.pixels()
-                    x = CenterConstraint()
-                    width = 95.percent()
-                    height = 25.pixels()
-                } childOf contentContainer
+                val rowWidth = 540f
+                val labelWidth = 340f
+                val rowHeight = 55f
+                val rowSpacing = 10f
+                val leftPad = 30f
+                val buttonPad = 20f
 
-                UIBlock().constrain {
-                    width = 100.percent()
-                    height = 100.percent()
-                    color = Color(70, 70, 70).toConstraint()
-                }.setRadius(5f.pixels()) childOf keybindRow
+                fun addFeatureRow(label: String, button: UIComponent, yConstraint: YConstraint, labelScale: Float) {
+                    val row = UIContainer().constrain {
+                        x = CenterConstraint()
+                        y = yConstraint
+                        width = rowWidth.pixels()
+                        height = rowHeight.pixels()
+                    } childOf contentContainer
 
-                UIText("Auto Fishing Keybind").constrain {
-                    x = 15.pixels()
-                    y = CenterConstraint()
-                    textScale = 0.8f.pixels()
-                    color = Color.WHITE.toConstraint()
-                } childOf keybindRow
+                    UIBlock().constrain {
+                        width = 100.percent()
+                        height = 100.percent()
+                        color = Color(70, 70, 70).toConstraint()
+                    }.setRadius(5.pixels()) childOf row
 
-                keybindButton = SimpleKeybindButton(FishMasterConfig.getAutoFishingKeybind()) {
-                    FishMasterConfig.setAutoFishingKeybind(it)
-                }.constrain {
-                    x = RelativeConstraint(0.97f) - width
-                    y = CenterConstraint()
-                } childOf keybindRow
+                    // Improved text positioning: vertically center, left align, and fix scale
+                    val labelText = UIText(label).constrain {
+                        x = leftPad.pixels()
+                        y = CenterConstraint() - (labelScale * 8).pixels() // Nudge up by half text height
+                        width = labelWidth.pixels()
+                        textScale = labelScale.pixels()
+                        color = Color.WHITE.toConstraint()
+                    } childOf row
 
-                val sckRow = UIContainer().constrain {
-                    y = SiblingConstraint(5f)
-                    x = CenterConstraint()
-                    width = 95.percent()
-                    height = 25.pixels()
-                } childOf contentContainer
+                    button.constrain {
+                        x = RelativeConstraint(1f) - FEATURE_BUTTON_WIDTH.pixels() - buttonPad.pixels()
+                        y = CenterConstraint()
+                    } childOf row
+                }
 
-                UIBlock().constrain {
-                    width = 100.percent()
-                    height = 100.percent()
-                    color = Color(70, 70, 70).toConstraint()
-                }.setRadius(5f.pixels()) childOf sckRow
-
-                UIText("Sea Creature Killer").constrain {
-                    x = 15.pixels()
-                    y = CenterConstraint()
-                    textScale = 0.8f.pixels()
-                    color = Color.WHITE.toConstraint()
-                } childOf sckRow
-
-                SimpleSwitch(FishMasterConfig.isSeaCreatureKillerEnabled()).apply {
-                    onStateChange = { newState ->
-                        FishMasterConfig.setSeaCreatureKillerEnabled(newState)
-                        SeaCreatureKiller.setEnabled(newState)
+                // Use a persistent keybindButton instance, wired to real config used by GuiKeybindHandler
+                if (keybindButton == null) {
+                    keybindButton = SimpleKeybindButton({ ConfigBridge.getAutoFishingKeybind() }) { keyCode ->
+                        ConfigBridge.setAutoFishingKeybind(keyCode)
                     }
-                }.constrain {
-                    x = RelativeConstraint(0.97f) - width
-                    y = CenterConstraint()
-                } childOf sckRow
+                }
 
-                val attackModeRow = UIContainer().constrain {
-                    y = SiblingConstraint(5f)
-                    x = CenterConstraint()
-                    width = 95.percent()
-                    height = 25.pixels()
-                } childOf contentContainer
+                addFeatureRow(
+                    "Auto Fishing Keybind",
+                    keybindButton!!,
+                    20.pixels(),
+                    0.45f // smaller, consistent text
+                )
 
-                UIBlock().constrain {
-                    width = 100.percent()
-                    height = 100.percent()
-                    color = Color(70, 70, 70).toConstraint()
-                }.setRadius(5f.pixels()) childOf attackModeRow
+                addFeatureRow(
+                    "Sea Creature Killer",
+                    SimpleSwitch(ConfigBridge.isSeaCreatureKillerEnabled()).apply {
+                        onStateChange = { newState ->
+                            SeaCreatureKiller.setEnabled(newState)
+                        }
+                    },
+                    SiblingConstraint(rowSpacing),
+                    0.45f // smaller, consistent text
+                )
 
-                UIText("Attack Mode").constrain {
-                    x = 15.pixels()
-                    y = CenterConstraint()
-                    textScale = 0.8f.pixels()
-                    color = Color.WHITE.toConstraint()
-                } childOf attackModeRow
-
-                SimpleDropdown(
-                    listOf("RCM", "Melee", "Fire Veil Wand"),
-                    FishMasterConfig.getSeaCreatureKillerMode()
-                ) {
-                    FishMasterConfig.setSeaCreatureKillerMode(it)
-                    if (it != "RCM") {
-                        MinecraftClient.getInstance().player?.sendMessage(
-                            Text.literal("[FishMaster] $it mode is a Work In Progress.").formatted(Formatting.YELLOW),
-                            false
-                        )
-                    }
-                }.constrain {
-                    x = RelativeConstraint(0.97f) - width
-                    y = CenterConstraint()
-                } childOf attackModeRow
+                addFeatureRow(
+                    "Attack Mode",
+                    run {
+                        val options = listOf("RCM", "Melee", "Fire Veil Wand")
+                        val initial = ConfigBridge.getSeaCreatureKillerMode().let { if (options.contains(it)) it else "RCM" }
+                        SimpleCycleButton(options, initial) { selected ->
+                            ConfigBridge.setSeaCreatureKillerMode(selected)
+                            // Announce chosen mode
+                            MinecraftClient.getInstance().player?.sendMessage(
+                                Text.literal("[FishMaster] Sea Creature Killer mode set to: ")
+                                    .formatted(Formatting.GREEN)
+                                    .append(Text.literal(selected).formatted(Formatting.AQUA)),
+                                false
+                            )
+                            // Only Melee remains WIP; Fire Veil Wand is implemented
+                            if (selected == "Melee") {
+                                MinecraftClient.getInstance().player?.sendMessage(
+                                    Text.literal("[FishMaster] $selected mode is a Work In Progress.").formatted(Formatting.YELLOW),
+                                    false
+                                )
+                            }
+                        }
+                    },
+                    SiblingConstraint(rowSpacing),
+                    0.38f // slightly smaller for Attack Mode
+                )
             }
             else -> {
                 // For other tabs, just show a label
@@ -529,10 +649,21 @@ class FishmasterScreen : WindowScreen(ElementaVersion.V5) {
     override fun shouldCloseOnEsc() = keybindButton?.isWaiting() != true
 
     override fun onKeyPressed(keyCode: Int, typedChar: Char, modifiers: gg.essential.universal.UKeyboard.Modifiers?) {
+        // Always check the persistent keybindButton
         if (keybindButton?.isWaiting() == true) {
             keybindButton?.handleKeyInput(keyCode)
-        } else {
-            super.onKeyPressed(keyCode, typedChar, modifiers)
+            return
         }
+        super.onKeyPressed(keyCode, typedChar, modifiers)
+    }
+
+    override fun close() {
+        // Restore the previous GUI scale
+        previousGuiScale?.let {
+            MinecraftClient.getInstance().options.guiScale.setValue(it)
+        }
+        super.close()
     }
 }
+
+const val FEATURE_BUTTON_WIDTH = 120f

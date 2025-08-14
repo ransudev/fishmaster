@@ -135,6 +135,15 @@ public class SeaCreatureKiller {
         updateMode();
     }
 
+    // Public accessors for FishingTracker and other features
+    public static boolean isTargetCreature(String name) {
+        return name != null && TARGET_CREATURES.contains(name);
+    }
+
+    public static Set<String> getTargetCreatures() {
+        return java.util.Collections.unmodifiableSet(TARGET_CREATURES);
+    }
+
     public static boolean isEnabled() {
         return enabled && autoFishEnabled;
     }
@@ -216,6 +225,9 @@ public class SeaCreatureKiller {
         MinecraftClient client = MinecraftClient.getInstance();
         if (client.player == null || client.world == null) return;
 
+        // Update rotation handler easing each tick
+        rohan.fishmaster.utils.RotationHandler.getInstance().tick();
+
         // Update mode if it changed in config
         updateMode();
 
@@ -292,6 +304,8 @@ public class SeaCreatureKiller {
             } else {
                 // For melee modes, we can attack immediately
                 canAttack = true;
+                // Trigger a brief ease-to target so crosshair naturally acquires before first click
+                rohan.fishmaster.utils.RotationHandler.getInstance().easeTo(target, 400L);
             }
 
             lastWeaponSwitchTime = System.currentTimeMillis();
@@ -309,13 +323,8 @@ public class SeaCreatureKiller {
             combatEndTime = System.currentTimeMillis();
             needsToSwitchBack = true;
 
-            String mode = FishMasterConfig.getSeaCreatureKillerMode();
-            if ("RCM".equals(mode)) {
-                startRotationTransition();
-            } else {
-                // For melee modes, just switch back to fishing rod
-                isTransitioning = false;
-            }
+            // Always rotate back to original orientation after combat for legit visuals
+            startRotationTransition();
 
             killCount++;
         }
@@ -416,8 +425,7 @@ public class SeaCreatureKiller {
             needsToSwitchBack = false;
             originalSlot = -1;
 
-            // Resume fishing after a short delay to ensure rotation transition is complete
-            triggerFishingResumption();
+            // Do not auto-cast here; let AutoFishingFeature handle casting to avoid double right-click
         } else {
             // Find any fishing rod if original slot doesn't have one
             for (int i = 0; i < 9; i++) {
@@ -428,32 +436,14 @@ public class SeaCreatureKiller {
                     needsToSwitchBack = false;
                     originalSlot = -1;
 
-                    // Resume fishing after a short delay to ensure rotation transition is complete
-                    triggerFishingResumption();
+                    // Do not auto-cast here; let AutoFishingFeature handle casting to avoid double right-click
                     break;
                 }
             }
         }
     }
 
-    private static void triggerFishingResumption() {
-        // Schedule fishing resumption after a brief delay to ensure transitions are complete
-        new Thread(() -> {
-            try {
-                Thread.sleep(500); // Wait for rotation transition to complete
-
-                MinecraftClient client = MinecraftClient.getInstance();
-                if (client.player != null && !inCombatMode) {
-                    // Right-click to cast the fishing rod
-                    if (client.interactionManager != null && isFishingRod(client.player.getMainHandStack())) {
-                        client.interactionManager.interactItem(client.player, Hand.MAIN_HAND);
-                    }
-                }
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-        }).start();
-    }
+    // Removed auto-cast on combat end to prevent conflicting with AutoFishingFeature's casting
 
     private static boolean isFishingRod(ItemStack stack) {
         if (stack == null || stack.isEmpty()) return false;
@@ -476,7 +466,7 @@ public class SeaCreatureKiller {
                displayName.contains("rod of championing");
     }
 
-    private static boolean isTargetSeaCreature(Entity entity) {
+    public static boolean isTargetSeaCreature(Entity entity) {
         if (entity == null) return false;
 
         String entityName = getEntityDisplayName(entity);
