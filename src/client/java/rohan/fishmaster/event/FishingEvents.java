@@ -4,13 +4,11 @@ import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import rohan.fishmaster.config.KeyBindings;
 import rohan.fishmaster.feature.AutoFishingFeature;
-import rohan.fishmaster.feature.FishingTracker;
 
 public class FishingEvents {
     public static void register() {
         // Register tick event for fishing type detection and safety checks
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
-            FishingTracker.tick();
             KeyBindings.onKey(); // Handle keybind presses
         });
 

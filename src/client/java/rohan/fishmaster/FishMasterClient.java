@@ -26,9 +26,6 @@ public class FishMasterClient implements ClientModInitializer {
             // Load config first
             FishMasterConfig.load();
 
-            // Enable fishing tracker by default - it's now ALWAYS active
-            FishMasterConfig.setFishingTrackerEnabled(true);
-
             // Initialize keybindings FIRST - this is critical for preventing the crash
             KeyBindings.register();
 
@@ -61,9 +58,6 @@ public class FishMasterClient implements ClientModInitializer {
                     rohan.fishmaster.feature.SeaCreatureKiller.tick();
                 }
             });
-
-            // Ensure fishing tracker is always enabled
-            FishMasterConfig.setFishingTrackerEnabled(true);
 
             initialized = true;
             System.out.println("[FishMaster] Core mod initialized successfully!");

@@ -1,6 +1,7 @@
 package rohan.fishmaster.utils;
 
 import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.math.Vec3d;
 
 /**
  * Utility class for angle calculations and rotations.
@@ -105,5 +106,27 @@ public class AngleUtils {
         newPitch = clampPitch(newPitch);
 
         return new float[]{newYaw, newPitch};
+    }
+
+    /**
+     * Calculates the yaw angle from the origin to the given position.
+     *
+     * @param pos The target position
+     * @return The calculated yaw angle
+     */
+    public static float getRotationYaw(Vec3d pos) {
+        // Calculate yaw from origin to pos
+        return (float)(Math.toDegrees(Math.atan2(pos.z, pos.x)) - 90.0F);
+    }
+
+    /**
+     * Calculates the needed yaw change to rotate from one yaw to another.
+     *
+     * @param fromYaw The starting yaw
+     * @param toYaw The target yaw
+     * @return The yaw change needed
+     */
+    public static float getNeededYawChange(float fromYaw, float toYaw) {
+        return getShortestRotationPath(fromYaw, toYaw);
     }
 }

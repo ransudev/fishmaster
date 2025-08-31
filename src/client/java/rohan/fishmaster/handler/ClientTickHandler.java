@@ -34,9 +34,6 @@ public class ClientTickHandler {
         // LOW: Statistics and tracking (every 20 ticks / 1 second)
         scheduler.scheduleRepeating("fishing_tracker", () -> {
             // Fishing tracker updates
-            if (MinecraftClient.getInstance().player != null) {
-                rohan.fishmaster.feature.FishingTracker.tick();
-            }
         }, Priority.LOW, 20);
 
         // BACKGROUND: Webhook health checks (every 100 ticks / 5 seconds)

@@ -16,11 +16,6 @@ public class FishMasterConfig {
     private static final Path CONFIG_PATH = FabricLoader.getInstance().getConfigDir().resolve("fishmaster").resolve("config.json");
 
     // Static fields for current values
-    private static boolean fishingTrackerEnabled = false;
-    private static boolean fishingTrackerSpookyEnabled = false;
-    private static boolean fishingTrackerMarinaEnabled = false;
-    private static boolean fishingTrackerWinterEnabled = false;
-    private static boolean fishingTrackerTimeSinceEnabled = true;
     private static boolean autoDetectFishingTypeEnabled = true;
     private static int fishingTrackerType = 0; // 0 = water, 1 = lava, 2 = none
     private static boolean antiAfkEnabled = true;
@@ -34,10 +29,11 @@ public class FishMasterConfig {
     private static boolean webhookEnabled = false;
     private static long healthCheckInterval = 300000; // 5 minutes in milliseconds
     private static String customMageWeapon = ""; // Custom mage weapon name for SCK
-    private static String customMeleeWeapon = ""; // Custom melee weapon name for SCK
     private static boolean seaCreatureKillerEnabled = false;
     private static String seaCreatureKillerMode = "default";
-    private static int autoFishingKeybind = GLFW.GLFW_KEY_UNKNOWN;
+    private static int autoFishingKeybind = GLFW.GLFW_KEY_B; // Default keybind set to 'B'
+    public static int devMKillDist = 100;
+    public static int devMKillRot = 100;
 
     // Default constructor for JSON serialization
     public FishMasterConfig() {
@@ -63,11 +59,6 @@ public class FishMasterConfig {
 
             if (config != null) {
                 // Load values from config object to static fields
-                fishingTrackerEnabled = config.fishingTrackerEnabled;
-                fishingTrackerSpookyEnabled = config.fishingTrackerSpookyEnabled;
-                fishingTrackerMarinaEnabled = config.fishingTrackerMarinaEnabled;
-                fishingTrackerWinterEnabled = config.fishingTrackerWinterEnabled;
-                fishingTrackerTimeSinceEnabled = config.fishingTrackerTimeSinceEnabled;
                 autoDetectFishingTypeEnabled = config.autoDetectFishingTypeEnabled;
                 fishingTrackerType = config.fishingTrackerType;
                 antiAfkEnabled = config.antiAfkEnabled;
@@ -81,10 +72,11 @@ public class FishMasterConfig {
                 webhookEnabled = config.webhookEnabled;
                 healthCheckInterval = config.healthCheckInterval > 0 ? config.healthCheckInterval : 300000;
                 customMageWeapon = config.customMageWeapon != null ? config.customMageWeapon : "";
-                customMeleeWeapon = config.customMeleeWeapon != null ? config.customMeleeWeapon : "";
                 seaCreatureKillerEnabled = config.seaCreatureKillerEnabled;
                 seaCreatureKillerMode = config.seaCreatureKillerMode != null ? config.seaCreatureKillerMode : "default";
                 autoFishingKeybind = config.autoFishingKeybind;
+                devMKillDist = config.devMKillDist;
+                devMKillRot = config.devMKillRot;
             }
             System.out.println("[FishMaster] Config loaded successfully. Webhook URL: " + (webhookUrl.isEmpty() ? "Not set" : "Set"));
         } catch (Exception e) {
@@ -101,11 +93,6 @@ public class FishMasterConfig {
 
             // Create a config object with current values for serialization
             ConfigData configData = new ConfigData();
-            configData.fishingTrackerEnabled = fishingTrackerEnabled;
-            configData.fishingTrackerSpookyEnabled = fishingTrackerSpookyEnabled;
-            configData.fishingTrackerMarinaEnabled = fishingTrackerMarinaEnabled;
-            configData.fishingTrackerWinterEnabled = fishingTrackerWinterEnabled;
-            configData.fishingTrackerTimeSinceEnabled = fishingTrackerTimeSinceEnabled;
             configData.autoDetectFishingTypeEnabled = autoDetectFishingTypeEnabled;
             configData.fishingTrackerType = fishingTrackerType;
             configData.antiAfkEnabled = antiAfkEnabled;
@@ -119,10 +106,11 @@ public class FishMasterConfig {
             configData.webhookEnabled = webhookEnabled;
             configData.healthCheckInterval = healthCheckInterval;
             configData.customMageWeapon = customMageWeapon;
-            configData.customMeleeWeapon = customMeleeWeapon;
             configData.seaCreatureKillerEnabled = seaCreatureKillerEnabled;
             configData.seaCreatureKillerMode = seaCreatureKillerMode;
             configData.autoFishingKeybind = autoFishingKeybind;
+            configData.devMKillDist = devMKillDist;
+            configData.devMKillRot = devMKillRot;
 
             String json = GSON.toJson(configData);
             Files.writeString(CONFIG_PATH, json);
@@ -134,11 +122,6 @@ public class FishMasterConfig {
 
     // Inner class for JSON serialization
     private static class ConfigData {
-        public boolean fishingTrackerEnabled;
-        public boolean fishingTrackerSpookyEnabled;
-        public boolean fishingTrackerMarinaEnabled;
-        public boolean fishingTrackerWinterEnabled;
-        public boolean fishingTrackerTimeSinceEnabled;
         public boolean autoDetectFishingTypeEnabled;
         public int fishingTrackerType;
         public boolean antiAfkEnabled;
@@ -152,18 +135,14 @@ public class FishMasterConfig {
         public boolean webhookEnabled;
         public long healthCheckInterval;
         public String customMageWeapon;
-        public String customMeleeWeapon;
         public boolean seaCreatureKillerEnabled;
         public String seaCreatureKillerMode;
         public int autoFishingKeybind;
+        public int devMKillDist;
+        public int devMKillRot;
     }
 
     // Getters and setters for config fields
-    public static boolean isFishingTrackerEnabled() { return fishingTrackerEnabled; }
-    public static boolean isFishingTrackerSpookyEnabled() { return fishingTrackerSpookyEnabled; }
-    public static boolean isFishingTrackerMarinaEnabled() { return fishingTrackerMarinaEnabled; }
-    public static boolean isFishingTrackerWinterEnabled() { return fishingTrackerWinterEnabled; }
-    public static boolean isFishingTrackerTimeSinceEnabled() { return fishingTrackerTimeSinceEnabled; }
     public static boolean isAutoDetectFishingTypeEnabled() { return autoDetectFishingTypeEnabled; }
     public static int getFishingTrackerType() { return fishingTrackerType; }
     public static boolean isAntiAfkEnabled() { return antiAfkEnabled; }
@@ -177,25 +156,13 @@ public class FishMasterConfig {
     public static boolean isWebhookEnabled() { return webhookEnabled; }
     public static long getHealthCheckInterval() { return healthCheckInterval; }
     public static String getCustomMageWeapon() { return customMageWeapon; }
-    public static String getCustomMeleeWeapon() { return customMeleeWeapon; }
     public static boolean isSeaCreatureKillerEnabled() { return seaCreatureKillerEnabled; }
     public static String getSeaCreatureKillerMode() { return seaCreatureKillerMode; }
     public static int getAutoFishingKeybind() { return autoFishingKeybind; }
 
-    public static void setFishingTrackerSpookyEnabled(boolean enabled) {
-        fishingTrackerSpookyEnabled = enabled;
-        fishingTrackerMarinaEnabled = enabled;
-        save();
-    }
-
-    public static void setFishingTrackerWinterEnabled(boolean enabled) {
-        fishingTrackerWinterEnabled = enabled;
-        save();
-    }
-
-    public static void setFishingTrackerTimeSinceEnabled(boolean enabled) {
-        fishingTrackerTimeSinceEnabled = enabled;
-        save();
+    public static void setAutoFishingKeybind(int keyCode) {
+        autoFishingKeybind = keyCode;
+        save(); // Save config after updating keybind
     }
 
     public static void setAutoDetectFishingTypeEnabled(boolean enabled) {
@@ -266,12 +233,6 @@ public class FishMasterConfig {
         System.out.println("[FishMaster] Custom mage weapon " + (customMageWeapon.isEmpty() ? "cleared" : "set to " + customMageWeapon));
     }
 
-    public static void setCustomMeleeWeapon(String weapon) {
-        customMeleeWeapon = weapon != null ? weapon : "";
-        save();
-        System.out.println("[FishMaster] Custom melee weapon " + (customMeleeWeapon.isEmpty() ? "cleared" : "set to " + customMeleeWeapon));
-    }
-
     public static void setSeaCreatureKillerEnabled(boolean enabled) {
         seaCreatureKillerEnabled = enabled;
         save();
@@ -281,11 +242,4 @@ public class FishMasterConfig {
         seaCreatureKillerMode = mode;
         save();
     }
-
-    public static void setFishingTrackerEnabled(boolean enabled) {
-        fishingTrackerEnabled = enabled;
-        save();
-    }
-
-    // Deprecated placeholder removed; use getter above
 }

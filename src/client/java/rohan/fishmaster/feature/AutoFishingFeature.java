@@ -110,7 +110,6 @@ public class AutoFishingFeature {
             sendDebugMessage("Pre-start checks passed - initializing systems");
             switchToFishingRod();
             ungrabMouse();
-            FishMasterConfig.setFishingTrackerEnabled(true);
             sessionStartTime = System.currentTimeMillis();
             lastSuccessfulFish = sessionStartTime;
             consecutiveFailures = 0;

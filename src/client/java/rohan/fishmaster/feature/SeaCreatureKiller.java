@@ -55,7 +55,6 @@ public class SeaCreatureKiller {
     // Mode system - only for attack methods
     private static SeaCreatureKillerMode currentMode;
     private static RCMMode rcmMode = new RCMMode();
-    private static MeleeMode meleeMode = new MeleeMode();
     private static FireVeilWandMode fireVeilWandMode = new FireVeilWandMode();
 
     // Set of specific sea creature names to target
@@ -206,9 +205,6 @@ public class SeaCreatureKiller {
     private static void updateMode() {
         String mode = FishMasterConfig.getSeaCreatureKillerMode();
         switch (mode) {
-            case "Melee":
-                currentMode = meleeMode;
-                break;
             case "Fire Veil Wand":
                 currentMode = fireVeilWandMode;
                 break;
@@ -304,8 +300,19 @@ public class SeaCreatureKiller {
             } else {
                 // For melee modes, we can attack immediately
                 canAttack = true;
-                // Trigger a brief ease-to target so crosshair naturally acquires before first click
-                rohan.fishmaster.utils.RotationHandler.getInstance().easeTo(target, 400L);
+                // Calculate look angles to target and smoothly rotate towards it
+                if (client.player != null) {
+                    double diffX = target.getX() - client.player.getX();
+                    double diffY = target.getY() + target.getHeight() / 2.0 - (client.player.getY() + client.player.getEyeHeight(client.player.getPose()));
+                    double diffZ = target.getZ() - client.player.getZ();
+
+                    double dist = Math.sqrt(diffX * diffX + diffZ * diffZ);
+                    float yaw = (float)(Math.atan2(diffZ, diffX) * 180.0 / Math.PI) - 90.0f;
+                    float pitch = (float)-(Math.atan2(diffY, dist) * 180.0 / Math.PI);
+
+                    // Smoothly rotate towards the target
+                    rohan.fishmaster.utils.RotationHandler.getInstance().easeTo(yaw, pitch, 400L);
+                }
             }
 
             lastWeaponSwitchTime = System.currentTimeMillis();

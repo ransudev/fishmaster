@@ -91,17 +91,6 @@ public abstract class SeaCreatureKillerMode {
         return displayName.contains(customWeapon);
     }
 
-    protected boolean isMeleeWeapon(ItemStack stack) {
-        if (stack == null || stack.isEmpty()) return false;
-
-        String displayName = stack.getName().getString().toLowerCase();
-        String customWeapon = rohan.fishmaster.config.FishMasterConfig.getCustomMeleeWeapon().toLowerCase();
-
-        if (customWeapon.isEmpty()) return false;
-
-        return displayName.contains(customWeapon);
-    }
-
     protected boolean isFishingRod(ItemStack stack) {
         if (stack == null || stack.isEmpty()) return false;
 
