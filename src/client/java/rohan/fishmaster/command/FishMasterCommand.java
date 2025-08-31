@@ -78,7 +78,6 @@ public class FishMasterCommand {
         if (client.player == null) {
             return 0;
         }
-
         client.player.sendMessage(
             Text.literal("[FishMaster] ").formatted(Formatting.AQUA)
                 .append(Text.literal("Custom melee weapon cleared! SCK will not use any melee weapon until you set one.").formatted(Formatting.YELLOW)), false);
