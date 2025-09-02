@@ -93,7 +93,6 @@ public class AutoFishingFeature {
         if (!enabled) {
             sendDebugMessage("Stopping auto fishing - cleaning up resources");
             stop();
-            AutoFishingRenderer.reset();
             restoreMouseGrab();
             emergencyStop = false;
             SeaCreatureKiller.setAutoFishEnabled(false);
@@ -384,11 +383,6 @@ public class AutoFishingFeature {
         // Session management failsafes removed - to be added later per user preference
     }
 
-    // --- Anti-AFK logic ---
-    private static void handleAntiAfk() {
-        // Disabled: no-op
-    }
-
     private static boolean performHealthCheck() {
         MinecraftClient client = MinecraftClient.getInstance();
 
@@ -535,18 +529,6 @@ public class AutoFishingFeature {
     public static void onServerSwitch() {
         emergencyStopWithReason("Server change detected");
         // emergencyStopWithReason already handles disabling sea creature killer
-    }
-
-    public static void onDimensionChange() {
-        emergencyStopWithReason("Dimension change detected");
-        // emergencyStopWithReason already handles disabling sea creature killer
-    }
-
-    // Method to be called when player takes damage
-    public static void onPlayerDamage() {
-        if (enabled) {
-            sendFailsafeMessage("Player took damage - monitoring health", false);
-        }
     }
 
 

@@ -11,11 +11,4 @@ import rohan.fishmaster.render.AutoFishingRenderer;
 
 @Mixin(InGameHud.class)
 public class InGameHudMixin {
-
-    @Inject(method = "render", at = @At("TAIL"))
-    private void onRender(DrawContext context, RenderTickCounter tickCounter, CallbackInfo ci) {
-        AutoFishingRenderer.renderAutoFishingIndicator(context, 0.0f);
-
-        rohan.fishmaster.feature.AutoFishingFeature.ensureMouseUngrabbedIfEnabled();
-    }
 }
