@@ -6,10 +6,12 @@ import gg.essential.elementa.WindowScreen
 import gg.essential.elementa.components.UIBlock
 import gg.essential.elementa.components.UIContainer
 import gg.essential.elementa.components.UIText
+import gg.essential.elementa.components.UIRoundedRectangle
 import gg.essential.elementa.constraints.*
 import gg.essential.elementa.constraints.animation.Animations
 import gg.essential.elementa.dsl.*
 import gg.essential.elementa.effects.OutlineEffect
+import gg.essential.elementa.effects.ScissorEffect
 import org.lwjgl.glfw.GLFW
 import rohan.fishmaster.feature.SeaCreatureKiller
 import java.awt.Color
@@ -62,7 +64,7 @@ private object ConfigBridge {
     }
 }
 
-class SimpleDropdown(
+class AnimatedDropdown(
     private val options: List<String>,
     initialSelection: String,
     private val onSelect: (String) -> Unit
@@ -72,79 +74,95 @@ class SimpleDropdown(
     private var expanded = false
     private val optionsContainer: UIComponent
     private val mainBox: UIComponent
+    private val dropdownIcon: UIText
+    private var isAnimating = false
 
     init {
         constrain {
-            width = 120.pixels()
-            height = 24.pixels()
+            width = 140.pixels()
+            height = 28.pixels()
         }
 
-        mainBox = UIBlock().constrain {
+        mainBox = UIRoundedRectangle(6f).constrain {
             width = 100.percent()
             height = 100.percent()
-            color = Color(70, 70, 70).toConstraint()
-        }.setRadius(3f.pixels()) childOf this
-        mainBox.effect(OutlineEffect(Color.BLACK, 1f))
-
+            color = Color(45, 45, 48).toConstraint()
+        } childOf this
+        
         selectedText = UIText(selectedOption).constrain {
-            x = CenterConstraint()
+            x = 12.pixels()
             y = CenterConstraint()
-            textScale = 1.0f.pixels()
-            color = Color(185, 187, 190).toConstraint()
+            textScale = 0.9f.pixels()
+            color = Color(200, 200, 205).toConstraint()
+        } childOf mainBox
+
+        dropdownIcon = UIText("▼").constrain {
+            x = RelativeConstraint(1f) - 15.pixels()
+            y = CenterConstraint()
+            textScale = 0.8f.pixels()
+            color = Color(140, 140, 145).toConstraint()
         } childOf mainBox
 
         optionsContainer = UIContainer().constrain {
             x = 0.pixels()
-            y = 100.percent() + 2.pixels()
+            y = 100.percent() + 4.pixels()
+            width = 100.percent()
+            height = 0.pixels()
+        } childOf this
+        
+        val optionsBackground = UIRoundedRectangle(6f).constrain {
+            width = 100.percent()
+            height = 100.percent()
+            color = Color(35, 35, 38).toConstraint()
+        } childOf optionsContainer
+
+        val optionsContent = UIContainer().constrain {
+            x = 0.pixels()
+            y = 0.pixels()
             width = 100.percent()
             height = ChildBasedSizeConstraint()
-        } childOf this
-        optionsContainer.hide(true)
+        } childOf optionsContainer
+        optionsContent.effect(ScissorEffect())
 
         options.forEach { option ->
             val optionBox = UIContainer().constrain {
                 y = SiblingConstraint()
                 width = 100.percent()
-                height = 24.pixels()
-            } childOf optionsContainer
-
-            val optionBackground = UIBlock().constrain {
-                width = 100.percent()
-                height = 100.percent()
-                color = Color(70, 70, 70).toConstraint()
-            }.setRadius(3f.pixels()) childOf optionBox
-            optionBackground.effect(OutlineEffect(Color.BLACK, 1f))
+                height = 28.pixels()
+            } childOf optionsContent
 
             val optionText = UIText(option).constrain {
-                x = CenterConstraint()
+                x = 12.pixels()
                 y = CenterConstraint()
-                textScale = 1.0f.pixels()
+                textScale = 0.9f.pixels()
                 color = Color(185, 187, 190).toConstraint()
             } childOf optionBox
 
             optionBox.onMouseEnter {
-                optionText.setColor(Color.WHITE)
-                optionBackground.animate {
-                    setColorAnimation(Animations.OUT_EXP, 0.5f, Color(90, 90, 90).toConstraint())
+                if (!isAnimating) {
+                    optionText.animate {
+                        setColorAnimation(Animations.OUT_EXP, 0.15f, Color.WHITE.toConstraint())
+                    }
+                    optionBox.animate {
+                        setColorAnimation(Animations.OUT_EXP, 0.15f, Color(55, 55, 58).toConstraint())
+                    }
                 }
             }
+
             optionBox.onMouseLeave {
-                optionText.setColor(Color(185, 187, 190))
-                optionBackground.animate {
-                    setColorAnimation(Animations.OUT_EXP, 0.5f, Color(70, 70, 70).toConstraint())
+                if (!isAnimating) {
+                    optionText.animate {
+                        setColorAnimation(Animations.OUT_EXP, 0.15f, Color(185, 187, 190).toConstraint())
+                    }
+                    optionBox.animate {
+                        setColorAnimation(Animations.OUT_EXP, 0.15f, Color(55, 55, 58).toConstraint())
+                    }
                 }
             }
-            fun selectOption() {
-                selectedOption = option
-                selectedText.setText(option)
-                onSelect(option) // Always call onSelect
-                optionsContainer.hide(true)
-                expanded = false
-            }
+
             optionBox.onMouseClick {
-                selectOption()
+                selectOption(option)
             }
-            optionBackground.onMouseClick { selectOption() }
         }
 
         mainBox.onMouseClick {
@@ -152,30 +170,93 @@ class SimpleDropdown(
         }
 
         mainBox.onMouseEnter {
-            mainBox.animate {
-                setColorAnimation(Animations.OUT_EXP, 0.5f, Color(90, 90, 90).toConstraint())
+            if (!isAnimating) {
+                mainBox.animate {
+                    setColorAnimation(Animations.OUT_EXP, 0.2f, Color(55, 55, 58).toConstraint())
+                }
+                selectedText.animate {
+                    setColorAnimation(Animations.OUT_EXP, 0.2f, Color.WHITE.toConstraint())
+                }
             }
         }
 
         mainBox.onMouseLeave {
-            mainBox.animate {
-                setColorAnimation(Animations.OUT_EXP, 0.5f, Color(70, 70, 70).toConstraint())
+            if (!expanded && !isAnimating) {
+                mainBox.animate {
+                    setColorAnimation(Animations.OUT_EXP, 0.2f, Color(45, 45, 48).toConstraint())
+                }
+                selectedText.animate {
+                    setColorAnimation(Animations.OUT_EXP, 0.2f, Color(200, 200, 205).toConstraint())
+                }
             }
         }
     }
 
+    private fun selectOption(option: String) {
+        selectedOption = option
+        selectedText.setText(option)
+        onSelect(option)
+        closeDropdown()
+    }
+
     private fun toggleDropdown() {
-        expanded = !expanded
+        if (isAnimating) return
+        
         if (expanded) {
-            optionsContainer.unhide(true)
+            closeDropdown()
         } else {
-            optionsContainer.hide(true)
+            openDropdown()
+        }
+    }
+
+    private fun openDropdown() {
+        if (isAnimating || expanded) return
+        
+        isAnimating = true
+        expanded = true
+        
+        val targetHeight = (options.size * 28).pixels()
+        
+        dropdownIcon.setText("▲")
+        dropdownIcon.animate {
+            setColorAnimation(Animations.OUT_EXP, 0.2f, Color(88, 101, 242).toConstraint())
+        }
+        
+        optionsContainer.animate {
+            setHeightAnimation(Animations.OUT_EXP, 0.25f, targetHeight)
+        }
+        
+        // Complete animation after delay
+        isAnimating = false
+    }
+
+    private fun closeDropdown() {
+        if (isAnimating || !expanded) return
+        
+        isAnimating = true
+        expanded = false
+        
+        dropdownIcon.setText("▼")
+        dropdownIcon.animate {
+            setColorAnimation(Animations.OUT_EXP, 0.2f, Color(140, 140, 145).toConstraint())
+        }
+        
+        optionsContainer.animate {
+            setHeightAnimation(Animations.OUT_EXP, 0.25f, 0.pixels())
+        }
+        
+        // Complete animation after delay  
+        isAnimating = false
+        mainBox.animate {
+            setColorAnimation(Animations.OUT_EXP, 0.2f, Color(45, 45, 48).toConstraint())
+        }
+        selectedText.animate {
+            setColorAnimation(Animations.OUT_EXP, 0.2f, Color(200, 200, 205).toConstraint())
         }
     }
 }
 
-// Temporary replacement for dropdown: a single button that cycles through options on click
-class SimpleCycleButton(
+class AnimatedCycleButton(
     private val options: List<String>,
     initialSelection: String,
     private val onChange: (String) -> Unit
@@ -183,145 +264,305 @@ class SimpleCycleButton(
     private var index = options.indexOf(initialSelection).let { if (it == -1) 0 else it }
     private val background: UIComponent
     private val text: UIText
+    private val leftArrow: UIText
+    private val rightArrow: UIText
+    private var isAnimating = false
 
     init {
         constrain {
-            width = 120.pixels()
-            height = 24.pixels()
+            width = 140.pixels()
+            height = 28.pixels()
         }
 
-        background = UIBlock().constrain {
+        background = UIRoundedRectangle(6f).constrain {
             width = 100.percent()
             height = 100.percent()
-            color = Color(70, 70, 70).toConstraint()
-        }.setRadius(3f.pixels()) childOf this
-        background.effect(OutlineEffect(Color.BLACK, 1f))
+            color = Color(45, 45, 48).toConstraint()
+        } childOf this
+
+        leftArrow = UIText("◀").constrain {
+            x = 8.pixels()
+            y = CenterConstraint()
+            textScale = 0.8f.pixels()
+            color = Color(140, 140, 145).toConstraint()
+        } childOf this
 
         text = UIText(options[index]).constrain {
             x = CenterConstraint()
             y = CenterConstraint()
-            textScale = 1.0f.pixels()
-            color = Color(185, 187, 190).toConstraint()
+            textScale = 0.9f.pixels()
+            color = Color(200, 200, 205).toConstraint()
         } childOf this
 
-        onMouseClick {
-            index = (index + 1) % options.size
-            val value = options[index]
-            text.setText(value)
-            onChange(value)
+        rightArrow = UIText("▶").constrain {
+            x = RelativeConstraint(1f) - 15.pixels()
+            y = CenterConstraint()
+            textScale = 0.8f.pixels()
+            color = Color(140, 140, 145).toConstraint()
+        } childOf this
+
+        // Left arrow click
+        leftArrow.onMouseClick {
+            cycleBackward()
         }
 
-        onMouseEnter {
-            background.animate {
-                setColorAnimation(Animations.OUT_EXP, 0.5f, Color(90, 90, 90).toConstraint())
+        leftArrow.onMouseEnter {
+            if (!isAnimating) {
+                leftArrow.animate {
+                    setColorAnimation(Animations.OUT_EXP, 0.15f, Color(88, 101, 242).toConstraint())
+                }
             }
         }
-        onMouseLeave {
-            background.animate {
-                setColorAnimation(Animations.OUT_EXP, 0.5f, Color(70, 70, 70).toConstraint())
+
+        leftArrow.onMouseLeave {
+            if (!isAnimating) {
+                leftArrow.animate {
+                    setColorAnimation(Animations.OUT_EXP, 0.15f, Color(140, 140, 145).toConstraint())
+                }
+            }
+        }
+
+        // Right arrow click
+        rightArrow.onMouseClick {
+            cycleForward()
+        }
+
+        rightArrow.onMouseEnter {
+            if (!isAnimating) {
+                rightArrow.animate {
+                    setColorAnimation(Animations.OUT_EXP, 0.15f, Color(88, 101, 242).toConstraint())
+                }
+            }
+        }
+
+        rightArrow.onMouseLeave {
+            if (!isAnimating) {
+                rightArrow.animate {
+                    setColorAnimation(Animations.OUT_EXP, 0.15f, Color(140, 140, 145).toConstraint())
+                }
+            }
+        }
+
+        // Center text click
+        text.onMouseClick {
+            cycleForward()
+        }
+
+        background.onMouseClick {
+            cycleForward()
+        }
+
+        background.onMouseEnter {
+            if (!isAnimating) {
+                background.animate {
+                    setColorAnimation(Animations.OUT_EXP, 0.2f, Color(55, 55, 58).toConstraint())
+                }
+                text.animate {
+                    setColorAnimation(Animations.OUT_EXP, 0.2f, Color.WHITE.toConstraint())
+                }
+            }
+        }
+
+        background.onMouseLeave {
+            if (!isAnimating) {
+                background.animate {
+                    setColorAnimation(Animations.OUT_EXP, 0.2f, Color(45, 45, 48).toConstraint())
+                }
+                text.animate {
+                    setColorAnimation(Animations.OUT_EXP, 0.2f, Color(200, 200, 205).toConstraint())
+                }
             }
         }
     }
+
+    private fun cycleForward() {
+        if (isAnimating) return
+        animateChange((index + 1) % options.size)
+    }
+
+    private fun cycleBackward() {
+        if (isAnimating) return
+        animateChange((index - 1 + options.size) % options.size)
+    }
+
+    private fun animateChange(newIndex: Int) {
+        if (newIndex == index) return
+        
+        isAnimating = true
+        
+        // Slide out current text
+        text.animate {
+            setXAnimation(Animations.OUT_EXP, 0.15f, (-50).pixels())
+        }
+        
+        // Update text and slide in after a short delay
+        index = newIndex
+        val newValue = options[index]
+        text.setText(newValue)
+        text.setX(RelativeConstraint(1f) + 50.pixels())
+        
+        text.animate {
+            setXAnimation(Animations.OUT_EXP, 0.15f, CenterConstraint())
+        }
+        
+        isAnimating = false
+        onChange(newValue)
+    }
 }
 
-class SimpleSwitch(initialState: Boolean) : UIComponent() {
+class AnimatedToggleSwitch(initialState: Boolean) : UIComponent() {
     private var enabled = initialState
-    val text = UIText(if (enabled) "ON" else "OFF")
     private val background: UIComponent
+    private val slider: UIComponent
+    private val enabledText: UIText
+    private val disabledText: UIText
+    private var isAnimating = false
 
     var onStateChange: (Boolean) -> Unit = {}
 
     init {
         constrain {
-            width = 45.pixels()
-            height = 22.5f.pixels()
+            width = 64.pixels()
+            height = 28.pixels()
         }
 
-        background = UIBlock().constrain {
+        background = UIRoundedRectangle(14f).constrain {
             width = 100.percent()
             height = 100.percent()
-            color = Color(70, 70, 70).toConstraint()
-        }.setRadius(3f.pixels()) childOf this
-        background.effect(OutlineEffect(Color.BLACK, 1f))
-
-        text.constrain {
-            x = CenterConstraint()
-            y = CenterConstraint()
-            textScale = 0.9f.pixels()
+            color = if (enabled) Color(88, 101, 242).toConstraint() else Color(45, 45, 48).toConstraint()
         } childOf this
 
-        updateColor()
+        disabledText = UIText("OFF").constrain {
+            x = 8.pixels()
+            y = CenterConstraint()
+            textScale = 0.7f.pixels()
+            color = Color(140, 140, 145).toConstraint()
+        } childOf this
+
+        enabledText = UIText("ON").constrain {
+            x = RelativeConstraint(1f) - 22.pixels()
+            y = CenterConstraint()
+            textScale = 0.7f.pixels()
+            color = Color.WHITE.toConstraint()
+        } childOf this
+
+        slider = UIRoundedRectangle(11f).constrain {
+            x = if (enabled) RelativeConstraint(1f) - 24.pixels() else 2.pixels()
+            y = CenterConstraint()
+            width = 22.pixels()
+            height = 22.pixels()
+            color = Color.WHITE.toConstraint()
+        } childOf this
+
+        updateVisibility()
 
         onMouseClick {
-            enabled = !enabled
-            text.setText(if (enabled) "ON" else "OFF")
-            updateColor()
-            onStateChange(enabled)
+            toggle()
         }
 
         onMouseEnter {
-            background.animate {
-                setColorAnimation(Animations.OUT_EXP, 0.5f, Color(90, 90, 90).toConstraint())
+            if (!isAnimating) {
+                slider.animate {
+                    setColorAnimation(Animations.OUT_EXP, 0.15f, Color(240, 240, 245).toConstraint())
+                }
             }
         }
 
         onMouseLeave {
-            background.animate {
-                setColorAnimation(Animations.OUT_EXP, 0.5f, Color(70, 70, 70).toConstraint())
+            if (!isAnimating) {
+                slider.animate {
+                    setColorAnimation(Animations.OUT_EXP, 0.15f, Color.WHITE.toConstraint())
+                }
             }
         }
     }
 
-    private fun updateColor() {
-        val textColor = if (enabled) Color(88, 101, 242) else Color(185, 187, 190)
-        text.setColor(textColor)
+    private fun toggle() {
+        if (isAnimating) return
+        
+        isAnimating = true
+        enabled = !enabled
+        
+        val targetX = if (enabled) RelativeConstraint(1f) - 24.pixels() else 2.pixels()
+        val targetColor = if (enabled) Color(88, 101, 242).toConstraint() else Color(45, 45, 48).toConstraint()
+        
+        slider.animate {
+            setXAnimation(Animations.OUT_EXP, 0.25f, targetX)
+        }
+        
+        background.animate {
+            setColorAnimation(Animations.OUT_EXP, 0.25f, targetColor)
+        }
+        
+        // Complete animation after delay
+        updateVisibility()
+        isAnimating = false
+        onStateChange(enabled)
+    }
+
+    private fun updateVisibility() {
+        if (enabled) {
+            enabledText.unhide()
+            disabledText.hide()
+        } else {
+            enabledText.hide()
+            disabledText.unhide()
+        }
     }
 }
 
-class SimpleKeybindButton(private val getKey: () -> Int, private val onKeySet: (Int) -> Unit) : UIComponent() {
+class KeybindButton(private val getKey: () -> Int, private val onKeySet: (Int) -> Unit) : UIComponent() {
     private var waitingForKey = false
     private val keyText: UIText
     private val background: UIComponent
 
     init {
         constrain {
-            width = 90.pixels()
-            height = 24.pixels()
+            width = 100.pixels()
+            height = 28.pixels()
         }
 
-        background = UIBlock().constrain {
+        background = UIRoundedRectangle(6f).constrain {
             width = 100.percent()
             height = 100.percent()
-            color = Color(70, 70, 70).toConstraint()
-        }.setRadius(3f.pixels()) childOf this
-        background.effect(OutlineEffect(Color.BLACK, 1f))
+            color = Color(45, 45, 48).toConstraint()
+        } childOf this
 
         keyText = UIText(getKeyName(getKey())).constrain {
             x = CenterConstraint()
             y = CenterConstraint()
-            textScale = 1.0f.pixels()
+            textScale = 0.9f.pixels()
+            color = Color(200, 200, 205).toConstraint()
         } childOf this
-
-        updateColor()
 
         onMouseClick {
             if (!waitingForKey) {
-                waitingForKey = true
-                keyText.setText("...")
-                updateColor()
+                startWaitingForKey()
             }
         }
 
         onMouseEnter {
-            background.animate {
-                setColorAnimation(Animations.OUT_EXP, 0.5f, Color(90, 90, 90).toConstraint())
+            if (!waitingForKey) {
+                background.animate {
+                    setColorAnimation(Animations.OUT_EXP, 0.2f, Color(55, 55, 58).toConstraint())
+                }
             }
         }
 
         onMouseLeave {
-            background.animate {
-                setColorAnimation(Animations.OUT_EXP, 0.5f, Color(70, 70, 70).toConstraint())
+            if (!waitingForKey) {
+                background.animate {
+                    setColorAnimation(Animations.OUT_EXP, 0.2f, Color(45, 45, 48).toConstraint())
+                }
             }
+        }
+    }
+
+    private fun startWaitingForKey() {
+        waitingForKey = true
+        keyText.setText("Press a key...")
+        background.animate {
+            setColorAnimation(Animations.OUT_EXP, 0.3f, Color(88, 101, 242).toConstraint())
         }
     }
 
@@ -347,18 +588,17 @@ class SimpleKeybindButton(private val getKey: () -> Int, private val onKeySet: (
         }
     }
 
-    private fun updateColor() {
-        val textColor = if (waitingForKey) Color(114, 137, 218) else Color(185, 187, 190)
-        keyText.setColor(textColor)
-    }
-
     fun handleKeyInput(keyCode: Int) {
         if (waitingForKey) {
             val finalKeyCode = if (keyCode == GLFW.GLFW_KEY_ESCAPE) GLFW.GLFW_KEY_UNKNOWN else keyCode
             waitingForKey = false
+            
             onKeySet(finalKeyCode)
-            keyText.setText(getKeyName(getKey())) // Always show the latest key from config
-            updateColor()
+            keyText.setText(getKeyName(getKey()))
+            
+            background.animate {
+                setColorAnimation(Animations.OUT_EXP, 0.3f, Color(45, 45, 48).toConstraint())
+            }
         }
     }
 
@@ -371,8 +611,10 @@ class FishmasterScreen : WindowScreen(ElementaVersion.V5) {
     private var selectedTab = tabs.first()
     private val contentContainer: UIComponent
     private val tabsComponents = mutableMapOf<String, UIComponent>()
-    private var keybindButton: SimpleKeybindButton? = null
+    private var keybindButton: KeybindButton? = null
     private val selectedTabUnderline: UIComponent
+    private val mainContainer: UIComponent
+    private var isClosing = false
 
     init {
         // Save the previous GUI scale
@@ -380,103 +622,154 @@ class FishmasterScreen : WindowScreen(ElementaVersion.V5) {
         // Force GUI scale to 2x
         MinecraftClient.getInstance().options.guiScale.setValue(2)
 
-        val mainContainer = UIContainer().constrain {
+        mainContainer = UIContainer().constrain {
             x = CenterConstraint()
             y = CenterConstraint()
-            width = 600.pixels()
-            height = 400.pixels()
+            width = 650.pixels()
+            height = 450.pixels()
         } childOf window
 
-        val background = UIBlock().constrain {
+        // Entrance animation
+        mainContainer.setY(RelativeConstraint(0.5f) + 50.pixels())
+        mainContainer.animate {
+            setYAnimation(Animations.OUT_EXP, 0.4f, CenterConstraint())
+        }
+
+        val background = UIRoundedRectangle(12f).constrain {
             width = 100.percent()
             height = 100.percent()
-            color = Color(45, 45, 45).toConstraint()
-        }.setRadius(10.pixels()) childOf mainContainer
-        background.effect(OutlineEffect(Color.BLACK, 2f))
+            color = Color(25, 25, 28).toConstraint()
+        } childOf mainContainer
 
-        // Header
+        // Header with gradient effect
         val header = UIContainer().constrain {
             x = 0.pixels()
             y = 0.pixels()
             width = 100.percent()
-            height = 50.pixels()
+            height = 60.pixels()
         } childOf mainContainer
 
-        val headerBackground = UIBlock().constrain {
+        val headerBackground = UIRoundedRectangle(12f).constrain {
             width = 100.percent()
             height = 100.percent()
-            color = Color(60, 60, 60).toConstraint()
-        }.setRadius(10.pixels()) childOf header
-        headerBackground.effect(OutlineEffect(Color.BLACK, 1f))
+            color = Color(35, 35, 38).toConstraint()
+        } childOf header
 
-        val title = UIText("FishMaster").constrain {
+        // Logo/Icon placeholder
+        val logoContainer = UIContainer().constrain {
             x = 20.pixels()
             y = CenterConstraint()
-            textScale = 1.5f.pixels()
+            width = 32.pixels()
+            height = 32.pixels()
+        } childOf header
+
+        val logo = UIRoundedRectangle(8f).constrain {
+            width = 100.percent()
+            height = 100.percent()
+            color = Color(88, 101, 242).toConstraint()
+        } childOf logoContainer
+
+        val logoText = UIText("F").constrain {
+            x = CenterConstraint()
+            y = CenterConstraint()
+            textScale = 1.2f.pixels()
+            color = Color.WHITE.toConstraint()
+        } childOf logo
+
+        val title = UIText("FishMaster").constrain {
+            x = 60.pixels()
+            y = CenterConstraint() - 5.pixels()
+            textScale = 1.8f.pixels()
             color = Color(88, 101, 242).toConstraint()
         } childOf header
 
-        val closeButton = UIContainer().constrain {
-            x = RelativeConstraint(1f) - 30.pixels()
-            y = CenterConstraint()
-            width = 20.pixels()
-            height = 20.pixels()
+        val subtitle = UIText("Advanced Fishing Automation").constrain {
+            x = 60.pixels()
+            y = CenterConstraint() + 8.pixels()
+            textScale = 0.8f.pixels()
+            color = Color(140, 140, 145).toConstraint()
         } childOf header
 
-        val closeButtonText = UIText("X").constrain {
+        // Animated close button
+        val closeButton = UIContainer().constrain {
+            x = RelativeConstraint(1f) - 45.pixels()
+            y = CenterConstraint()
+            width = 30.pixels()
+            height = 30.pixels()
+        } childOf header
+
+        val closeButtonBg = UIRoundedRectangle(6f).constrain {
+            width = 100.percent()
+            height = 100.percent()
+            color = Color(0, 0, 0, 0).toConstraint()
+        } childOf closeButton
+
+        val closeButtonText = UIText("✕").constrain {
             x = CenterConstraint()
             y = CenterConstraint()
-            color = Color.WHITE.toConstraint()
+            textScale = 1.1f.pixels()
+            color = Color(140, 140, 145).toConstraint()
         } childOf closeButton
 
         closeButton.onMouseClick {
-            close()
+            closeWithAnimation()
         }
 
         closeButton.onMouseEnter {
-            closeButtonText.setColor(Color.RED.toConstraint())
+            closeButtonBg.animate {
+                setColorAnimation(Animations.OUT_EXP, 0.2f, Color(220, 53, 69, 20).toConstraint())
+            }
+            closeButtonText.animate {
+                setColorAnimation(Animations.OUT_EXP, 0.2f, Color(220, 53, 69).toConstraint())
+            }
         }
 
         closeButton.onMouseLeave {
-            closeButtonText.setColor(Color.WHITE.toConstraint())
+            closeButtonBg.animate {
+                setColorAnimation(Animations.OUT_EXP, 0.2f, Color(0, 0, 0, 0).toConstraint())
+            }
+            closeButtonText.animate {
+                setColorAnimation(Animations.OUT_EXP, 0.2f, Color(140, 140, 145).toConstraint())
+            }
         }
 
-        // Tabs
+        // Tabs with improved styling
         val tabsContainer = UIContainer().constrain {
             x = 0.pixels()
-            y = 50.pixels()
+            y = 60.pixels()
             width = 100.percent()
-            height = 35.pixels()
+            height = 45.pixels()
         } childOf mainContainer
 
-        val tabsBackground = UIBlock().constrain {
+        val tabsBackground = UIRoundedRectangle(12f).constrain {
             width = 100.percent()
             height = 100.percent()
-            color = Color(55, 55, 55).toConstraint()
+            color = Color(30, 30, 33).toConstraint()
         } childOf tabsContainer
 
-        // Content area
+        // Content area with shadow effect
         contentContainer = UIContainer().constrain {
             x = 0.pixels()
-            y = 85.pixels()
+            y = 105.pixels()
             width = 100.percent()
-            height = 100.percent() - 85.pixels()
+            height = 100.percent() - 105.pixels()
         } childOf mainContainer
+        contentContainer.effect(ScissorEffect())
 
-        selectedTabUnderline = UIBlock().constrain {
-            x = 0.pixels()
+        selectedTabUnderline = UIRoundedRectangle(2f).constrain {
+            x = 15.pixels()
             y = 100.percent() - 3.pixels()
-            width = 90.pixels()
+            width = 100.pixels()
             height = 3.pixels()
             color = Color(88, 101, 242).toConstraint()
         } childOf tabsContainer
 
-        // Create tabs
+        // Create tabs with animations
         tabs.forEachIndexed { index, tab ->
             val tabButton = UIContainer().constrain {
-                x = (index * 90).pixels()
+                x = (15 + index * 120).pixels()
                 y = 0.pixels()
-                width = 90.pixels()
+                width = 100.pixels()
                 height = 100.percent()
             } childOf tabsContainer
             tabsComponents[tab] = tabButton
@@ -484,7 +777,8 @@ class FishmasterScreen : WindowScreen(ElementaVersion.V5) {
             val tabText = UIText(tab).constrain {
                 x = CenterConstraint()
                 y = CenterConstraint()
-                color = if (tab == selectedTab) Color.WHITE.toConstraint() else Color(185, 187, 190).toConstraint()
+                textScale = 1.0f.pixels()
+                color = if (tab == selectedTab) Color.WHITE.toConstraint() else Color(140, 140, 145).toConstraint()
             } childOf tabButton
 
             tabButton.onMouseClick {
@@ -494,7 +788,7 @@ class FishmasterScreen : WindowScreen(ElementaVersion.V5) {
             tabButton.onMouseEnter {
                 if (tab != selectedTab) {
                     tabText.animate {
-                        setColorAnimation(Animations.OUT_EXP, 0.3f, Color.WHITE.toConstraint())
+                        setColorAnimation(Animations.OUT_EXP, 0.2f, Color(200, 200, 205).toConstraint())
                     }
                 }
             }
@@ -502,7 +796,7 @@ class FishmasterScreen : WindowScreen(ElementaVersion.V5) {
             tabButton.onMouseLeave {
                 if (tab != selectedTab) {
                     tabText.animate {
-                        setColorAnimation(Animations.OUT_EXP, 0.3f, Color(185, 187, 190).toConstraint())
+                        setColorAnimation(Animations.OUT_EXP, 0.2f, Color(140, 140, 145).toConstraint())
                     }
                 }
             }
@@ -513,10 +807,24 @@ class FishmasterScreen : WindowScreen(ElementaVersion.V5) {
         showTab(selectedTab)
     }
 
+    private fun closeWithAnimation() {
+        if (isClosing) return
+        isClosing = true
+        
+        mainContainer.animate {
+            setYAnimation(Animations.OUT_EXP, 0.3f, RelativeConstraint(0.5f) + 50.pixels())
+        }
+        
+        // Close after animation
+        close()
+    }
+
     private fun selectTab(tab: String, index: Int) {
+        if (selectedTab == tab) return
+        
         selectedTab = tab
         updateTabStyles(index)
-        showTab(tab)
+        showTabWithAnimation(tab)
     }
 
     private fun updateTabStyles(selectedIndex: Int) {
@@ -524,20 +832,31 @@ class FishmasterScreen : WindowScreen(ElementaVersion.V5) {
             val tabButton = tabsComponents[tab] ?: return
             val tabText = (tabButton.children.first() as UIText)
             if (index == selectedIndex) {
-                tabText.setColor(Color.WHITE.toConstraint())
+                tabText.animate {
+                    setColorAnimation(Animations.OUT_EXP, 0.2f, Color.WHITE.toConstraint())
+                }
             } else {
-                tabText.setColor(Color(185, 187, 190).toConstraint())
+                tabText.animate {
+                    setColorAnimation(Animations.OUT_EXP, 0.2f, Color(140, 140, 145).toConstraint())
+                }
             }
         }
 
-        val targetX = (selectedIndex * 90)
+        val targetX = (15 + selectedIndex * 120).pixels()
         selectedTabUnderline.animate {
-            setXAnimation(Animations.OUT_EXP, 0.3f, targetX.pixels())
+            setXAnimation(Animations.OUT_EXP, 0.3f, targetX)
         }
     }
 
     private fun initializeTabContent() {
         // Initialize content for each tab if needed
+    }
+
+    private fun showTabWithAnimation(tab: String) {
+        // Simple fade effect without onComplete chaining (not available in current Elementa build)
+        contentContainer.clearChildren()
+        showTab(tab)
+        // Optionally do a quick flash/animation on new content container children if needed later
     }
 
     private fun showTab(tab: String) {
@@ -546,103 +865,171 @@ class FishmasterScreen : WindowScreen(ElementaVersion.V5) {
         if (tab != "Main") keybindButton = null
 
         when (tab) {
-            "Main" -> {
-                val rowWidth = 540f
-                val labelWidth = 340f
-                val rowHeight = 55f
-                val rowSpacing = 10f
-                val leftPad = 30f
-                val buttonPad = 20f
+            "Main" -> createMainTabContent()
+            "Misc" -> createMiscTabContent()
+            "Failsafes" -> createFailsafesTabContent()
+            "Extras" -> createExtrasTabContent()
+        }
+    }
 
-                fun addFeatureRow(label: String, button: UIComponent, yConstraint: YConstraint, labelScale: Float) {
-                    val row = UIContainer().constrain {
-                        x = CenterConstraint()
-                        y = yConstraint
-                        width = rowWidth.pixels()
-                        height = rowHeight.pixels()
-                    } childOf contentContainer
+    private fun createMainTabContent() {
+        val contentWrapper = UIContainer().constrain {
+            x = 0.pixels()
+            y = 0.pixels()
+            width = 100.percent()
+            height = 100.percent()
+        } childOf contentContainer
 
-                    UIBlock().constrain {
-                        width = 100.percent()
-                        height = 100.percent()
-                        color = Color(70, 70, 70).toConstraint()
-                    }.setRadius(5.pixels()) childOf row
+        val scrollContainer = UIContainer().constrain {
+            x = 30.pixels()
+            y = 20.pixels()
+            width = 100.percent() - 60.pixels()
+            height = 100.percent() - 40.pixels()
+        } childOf contentWrapper
 
-                    // Improved text positioning: vertically center, left align, and fix scale
-                    val labelText = UIText(label).constrain {
-                        x = leftPad.pixels()
-                        y = CenterConstraint() - (labelScale * 8).pixels() // Nudge up by half text height
-                        width = labelWidth.pixels()
-                        textScale = labelScale.pixels()
-                        color = Color.WHITE.toConstraint()
-                    } childOf row
+        createFeatureCard(
+            scrollContainer,
+            "Auto Fishing",
+            "Configure your automatic fishing keybind",
+            0.pixels(),
+            createKeybindControl()
+        )
 
-                    button.constrain {
-                        x = RelativeConstraint(1f) - FEATURE_BUTTON_WIDTH.pixels() - buttonPad.pixels()
-                        y = CenterConstraint()
-                    } childOf row
-                }
+        val toggle = createToggleControl(ConfigBridge.isSeaCreatureKillerEnabled()) { }
+        
+        createFeatureCard(
+            scrollContainer,
+            "Sea Creature Killer",
+            "Automatically eliminate sea creatures when caught",
+            SiblingConstraint(15f),
+            toggle
+        )
 
-                // Use a persistent keybindButton instance, wired to real config used by GuiKeybindHandler
-                if (keybindButton == null) {
-                    keybindButton = SimpleKeybindButton({ ConfigBridge.getAutoFishingKeybind() }) { keyCode ->
-                        ConfigBridge.setAutoFishingKeybind(keyCode)
-                    }
-                }
+        val attackModeCard = createFeatureCard(
+            scrollContainer,
+            "Attack Mode",
+            "Choose how to attack sea creatures",
+            SiblingConstraint(15f),
+            createModeSelector()
+        )
 
-                addFeatureRow(
-                    "Auto Fishing Keybind",
-                    keybindButton!!,
-                    20.pixels(),
-                    0.45f // smaller, consistent text
-                )
-
-                addFeatureRow(
-                    "Sea Creature Killer",
-                    SimpleSwitch(ConfigBridge.isSeaCreatureKillerEnabled()).apply {
-                        onStateChange = { newState ->
-                            SeaCreatureKiller.setEnabled(newState)
-                        }
-                    },
-                    SiblingConstraint(rowSpacing),
-                    0.45f // smaller, consistent text
-                )
-
-                addFeatureRow(
-                    "Attack Mode",
-                    run {
-                        val options = listOf("RCM", "Melee", "Fire Veil Wand")
-                        val initial = ConfigBridge.getSeaCreatureKillerMode().let { if (options.contains(it)) it else "RCM" }
-                        SimpleCycleButton(options, initial) { selected ->
-                            ConfigBridge.setSeaCreatureKillerMode(selected)
-                            // Announce chosen mode
-                            MinecraftClient.getInstance().player?.sendMessage(
-                                Text.literal("[FishMaster] Sea Creature Killer mode set to: ")
-                                    .formatted(Formatting.GREEN)
-                                    .append(Text.literal(selected).formatted(Formatting.AQUA)),
-                                false
-                            )
-                            // Only Melee remains WIP; Fire Veil Wand is implemented
-                            if (selected == "Melee") {
-                                MinecraftClient.getInstance().player?.sendMessage(
-                                    Text.literal("[FishMaster] $selected mode is a Work In Progress.").formatted(Formatting.YELLOW),
-                                    false
-                                )
-                            }
-                        }
-                    },
-                    SiblingConstraint(rowSpacing),
-                    0.38f // slightly smaller for Attack Mode
-                )
+        (toggle as AnimatedToggleSwitch).onStateChange = { newState ->
+            SeaCreatureKiller.setEnabled(newState)
+            if (newState) {
+                attackModeCard.unhide(true)
+            } else {
+                attackModeCard.hide(true)
             }
-            else -> {
-                // For other tabs, just show a label
-                UIText("Content for $tab").constrain {
-                    x = CenterConstraint()
-                    y = CenterConstraint()
-                    color = Color.WHITE.toConstraint()
-                } childOf contentContainer
+        }
+
+        if (!ConfigBridge.isSeaCreatureKillerEnabled()) {
+            attackModeCard.hide()
+        }
+    }
+
+    private fun createMiscTabContent() {
+        val label = UIText("Miscellaneous Settings").constrain {
+            x = CenterConstraint()
+            y = CenterConstraint()
+            textScale = 1.2f.pixels()
+            color = Color(140, 140, 145).toConstraint()
+        } childOf contentContainer
+    }
+
+    private fun createFailsafesTabContent() {
+        val label = UIText("Failsafe Configuration").constrain {
+            x = CenterConstraint()
+            y = CenterConstraint()
+            textScale = 1.2f.pixels()
+            color = Color(140, 140, 145).toConstraint()
+        } childOf contentContainer
+    }
+
+    private fun createExtrasTabContent() {
+        val label = UIText("Extra Features").constrain {
+            x = CenterConstraint()
+            y = CenterConstraint()
+            textScale = 1.2f.pixels()
+            color = Color(140, 140, 145).toConstraint()
+        } childOf contentContainer
+    }
+
+    private fun createFeatureCard(parent: UIComponent, title: String, description: String, yConstraint: YConstraint, control: UIComponent): UIComponent {
+        val card = UIContainer().constrain {
+            x = 0.pixels()
+            y = yConstraint
+            width = 100.percent()
+            height = 80.pixels()
+        } childOf parent
+
+        val cardBackground = UIRoundedRectangle(8f).constrain {
+            width = 100.percent()
+            height = 100.percent()
+            color = Color(35, 35, 38).toConstraint()
+        } childOf card
+
+        val titleText = UIText(title).constrain {
+            x = 20.pixels()
+            y = 15.pixels()
+            textScale = 1.1f.pixels()
+            color = Color.WHITE.toConstraint()
+        } childOf card
+
+        val descText = UIText(description).constrain {
+            x = 20.pixels()
+            y = 35.pixels()
+            textScale = 0.8f.pixels()
+            color = Color(140, 140, 145).toConstraint()
+        } childOf card
+
+        control.constrain {
+            x = RelativeConstraint(1f) - 20.pixels() - 140.pixels()
+            y = CenterConstraint()
+        } childOf card
+
+        // Hover effect
+        card.onMouseEnter {
+            cardBackground.animate {
+                setColorAnimation(Animations.OUT_EXP, 0.2f, Color(40, 40, 43).toConstraint())
             }
+        }
+
+        card.onMouseLeave {
+            cardBackground.animate {
+                setColorAnimation(Animations.OUT_EXP, 0.2f, Color(35, 35, 38).toConstraint())
+            }
+        }
+        return card
+    }
+
+    private fun createKeybindControl(): UIComponent {
+        if (keybindButton == null) {
+            keybindButton = KeybindButton({ ConfigBridge.getAutoFishingKeybind() }) { keyCode ->
+                ConfigBridge.setAutoFishingKeybind(keyCode)
+            }
+        }
+        return keybindButton!!
+    }
+
+    private fun createToggleControl(initialState: Boolean, onStateChange: (Boolean) -> Unit): UIComponent {
+        return AnimatedToggleSwitch(initialState).apply {
+            this.onStateChange = onStateChange
+        }
+    }
+
+    private fun createModeSelector(): UIComponent {
+        val options = listOf("RCM", "Fire Veil Wand")
+        val initial = ConfigBridge.getSeaCreatureKillerMode().let { if (options.contains(it)) it else "RCM" }
+        
+        return AnimatedCycleButton(options, initial) { selected ->
+            ConfigBridge.setSeaCreatureKillerMode(selected)
+            // Announce chosen mode
+            MinecraftClient.getInstance().player?.sendMessage(
+                Text.literal("[FishMaster] Sea Creature Killer mode set to: ")
+                    .formatted(Formatting.GREEN)
+                    .append(Text.literal(selected).formatted(Formatting.AQUA)),
+                false
+            )
         }
     }
 
@@ -666,4 +1053,4 @@ class FishmasterScreen : WindowScreen(ElementaVersion.V5) {
     }
 }
 
-const val FEATURE_BUTTON_WIDTH = 120f
+const val FEATURE_BUTTON_WIDTH = 140f
