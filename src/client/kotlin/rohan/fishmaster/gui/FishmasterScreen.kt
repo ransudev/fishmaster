@@ -23,7 +23,7 @@ import net.minecraft.util.Formatting
 
 // Bridge to access Java config statics without Kotlin compile-time dependency on the client Java task order
 private object ConfigBridge {
-    private const val CLASS_NAME = "rohan.fishmaster.config.FishMasterConfig"
+    private const val CLASS_NAME = "rohan.fishmaster.config.FishMasterConfigNew"
 
     private fun clazz(): Class<*>? = try {
         Class.forName(CLASS_NAME)
@@ -40,7 +40,10 @@ private object ConfigBridge {
             val c = clazz() ?: return
             val m = c.getMethod("setAutoFishingKeybind", Int::class.javaPrimitiveType)
             m.invoke(null, key)
-        } catch (_: Throwable) { }
+            println("[GUI] AutoFishing keybind updated to: $key")
+        } catch (e: Throwable) { 
+            println("[GUI] Failed to set keybind: ${e.message}")
+        }
     }
 
     fun isSeaCreatureKillerEnabled(): Boolean = try {
@@ -48,6 +51,17 @@ private object ConfigBridge {
         val m = c.getMethod("isSeaCreatureKillerEnabled")
         (m.invoke(null) as? Boolean) ?: false
     } catch (_: Throwable) { false }
+
+    fun setSeaCreatureKillerEnabled(enabled: Boolean) {
+        try {
+            val c = clazz() ?: return
+            val m = c.getMethod("setSeaCreatureKillerEnabled", Boolean::class.javaPrimitiveType)
+            m.invoke(null, enabled)
+            println("[GUI] Sea Creature Killer updated to: $enabled")
+        } catch (e: Throwable) { 
+            println("[GUI] Failed to set SCK enabled: ${e.message}")
+        }
+    }
 
     fun getSeaCreatureKillerMode(): String = try {
         val c = clazz() ?: return "RCM"
@@ -60,22 +74,34 @@ private object ConfigBridge {
             val c = clazz() ?: return
             val m = c.getMethod("setSeaCreatureKillerMode", String::class.java)
             m.invoke(null, mode)
-        } catch (_: Throwable) { }
+            println("[GUI] Sea Creature Killer mode updated to: $mode")
+        } catch (e: Throwable) { 
+            println("[GUI] Failed to set SCK mode: ${e.message}")
+        }
     }
 
     fun getRecastDelay(): Float = try {
-        val c = clazz() ?: return 20f // Default 20 ticks (1 second)
+        val c = clazz() ?: return 5f // Default 5 ticks (250ms)
         val m = c.getMethod("getRecastDelay")
-        (m.invoke(null) as? Float) ?: 20f
-    } catch (_: Throwable) { 20f }
+        (m.invoke(null) as? Float) ?: 5f
+    } catch (_: Throwable) { 5f }
 
     fun setRecastDelay(delay: Float) {
         try {
             val c = clazz() ?: return
             val m = c.getMethod("setRecastDelay", Float::class.javaPrimitiveType)
             m.invoke(null, delay)
-        } catch (_: Throwable) { }
+            println("[GUI] Recast delay updated to: ${delay * 50}ms")
+        } catch (e: Throwable) { 
+            println("[GUI] Failed to set recast delay: ${e.message}")
+        }
     }
+
+    fun isConfigLoaded(): Boolean = try {
+        val c = clazz() ?: return false
+        val m = c.getMethod("isConfigLoaded")
+        (m.invoke(null) as? Boolean) ?: false
+    } catch (_: Throwable) { false }
 }
 
 class AnimatedDropdown(
@@ -100,7 +126,7 @@ class AnimatedDropdown(
         mainBox = UIRoundedRectangle(6f).constrain {
             width = 100.percent()
             height = 100.percent()
-            color = Color(45, 45, 48).toConstraint()
+            color = Color(35, 38, 45).toConstraint() // Darker with blue tint
         } childOf this
         
         selectedText = UIText(selectedOption).constrain {
@@ -114,7 +140,7 @@ class AnimatedDropdown(
             x = RelativeConstraint(1f) - 15.pixels()
             y = CenterConstraint()
             textScale = 0.8f.pixels()
-            color = Color(140, 140, 145).toConstraint()
+            color = Color(160, 165, 175).toConstraint()
         } childOf mainBox
 
         optionsContainer = UIContainer().constrain {
@@ -127,7 +153,7 @@ class AnimatedDropdown(
         val optionsBackground = UIRoundedRectangle(6f).constrain {
             width = 100.percent()
             height = 100.percent()
-            color = Color(35, 35, 38).toConstraint()
+            color = Color(25, 28, 35).toConstraint() // Darker dropdown
         } childOf optionsContainer
 
         val optionsContent = UIContainer().constrain {
@@ -186,10 +212,10 @@ class AnimatedDropdown(
         mainBox.onMouseEnter {
             if (!isAnimating) {
                 mainBox.animate {
-                    setColorAnimation(Animations.OUT_EXP, 0.2f, Color(55, 55, 58).toConstraint())
+                    setColorAnimation(Animations.OUT_EXP, 0.2f, Color(45, 50, 60).toConstraint()) // Brighter on hover
                 }
                 selectedText.animate {
-                    setColorAnimation(Animations.OUT_EXP, 0.2f, Color.WHITE.toConstraint())
+                    setColorAnimation(Animations.OUT_EXP, 0.2f, Color(255, 255, 255).toConstraint())
                 }
             }
         }
@@ -197,7 +223,7 @@ class AnimatedDropdown(
         mainBox.onMouseLeave {
             if (!expanded && !isAnimating) {
                 mainBox.animate {
-                    setColorAnimation(Animations.OUT_EXP, 0.2f, Color(45, 45, 48).toConstraint())
+                    setColorAnimation(Animations.OUT_EXP, 0.2f, Color(35, 38, 45).toConstraint())
                 }
                 selectedText.animate {
                     setColorAnimation(Animations.OUT_EXP, 0.2f, Color(200, 200, 205).toConstraint())
@@ -233,7 +259,7 @@ class AnimatedDropdown(
         
         dropdownIcon.setText("▲")
         dropdownIcon.animate {
-            setColorAnimation(Animations.OUT_EXP, 0.2f, Color(88, 101, 242).toConstraint())
+            setColorAnimation(Animations.OUT_EXP, 0.2f, Color(88, 191, 242).toConstraint()) // Bright cyan when open
         }
         
         optionsContainer.animate {
@@ -252,7 +278,7 @@ class AnimatedDropdown(
         
         dropdownIcon.setText("▼")
         dropdownIcon.animate {
-            setColorAnimation(Animations.OUT_EXP, 0.2f, Color(140, 140, 145).toConstraint())
+            setColorAnimation(Animations.OUT_EXP, 0.2f, Color(160, 165, 175).toConstraint())
         }
         
         optionsContainer.animate {
@@ -262,7 +288,7 @@ class AnimatedDropdown(
         // Complete animation after delay  
         isAnimating = false
         mainBox.animate {
-            setColorAnimation(Animations.OUT_EXP, 0.2f, Color(45, 45, 48).toConstraint())
+            setColorAnimation(Animations.OUT_EXP, 0.2f, Color(35, 38, 45).toConstraint())
         }
         selectedText.animate {
             setColorAnimation(Animations.OUT_EXP, 0.2f, Color(200, 200, 205).toConstraint())
@@ -291,14 +317,14 @@ class AnimatedCycleButton(
         background = UIRoundedRectangle(6f).constrain {
             width = 100.percent()
             height = 100.percent()
-            color = Color(45, 45, 48).toConstraint()
+            color = Color(35, 38, 45).toConstraint() // Darker with blue tint
         } childOf this
 
         leftArrow = UIText("◀").constrain {
             x = 8.pixels()
             y = CenterConstraint()
             textScale = 0.8f.pixels()
-            color = Color(140, 140, 145).toConstraint()
+            color = Color(160, 165, 175).toConstraint()
         } childOf this
 
         text = UIText(options[index]).constrain {
@@ -312,7 +338,7 @@ class AnimatedCycleButton(
             x = RelativeConstraint(1f) - 15.pixels()
             y = CenterConstraint()
             textScale = 0.8f.pixels()
-            color = Color(140, 140, 145).toConstraint()
+            color = Color(160, 165, 175).toConstraint()
         } childOf this
 
         // Left arrow click
@@ -323,7 +349,7 @@ class AnimatedCycleButton(
         leftArrow.onMouseEnter {
             if (!isAnimating) {
                 leftArrow.animate {
-                    setColorAnimation(Animations.OUT_EXP, 0.15f, Color(88, 101, 242).toConstraint())
+                    setColorAnimation(Animations.OUT_EXP, 0.15f, Color(88, 191, 242).toConstraint()) // Bright cyan
                 }
             }
         }
@@ -331,7 +357,7 @@ class AnimatedCycleButton(
         leftArrow.onMouseLeave {
             if (!isAnimating) {
                 leftArrow.animate {
-                    setColorAnimation(Animations.OUT_EXP, 0.15f, Color(140, 140, 145).toConstraint())
+                    setColorAnimation(Animations.OUT_EXP, 0.15f, Color(160, 165, 175).toConstraint())
                 }
             }
         }
@@ -344,7 +370,7 @@ class AnimatedCycleButton(
         rightArrow.onMouseEnter {
             if (!isAnimating) {
                 rightArrow.animate {
-                    setColorAnimation(Animations.OUT_EXP, 0.15f, Color(88, 101, 242).toConstraint())
+                    setColorAnimation(Animations.OUT_EXP, 0.15f, Color(88, 191, 242).toConstraint()) // Bright cyan
                 }
             }
         }
@@ -352,7 +378,7 @@ class AnimatedCycleButton(
         rightArrow.onMouseLeave {
             if (!isAnimating) {
                 rightArrow.animate {
-                    setColorAnimation(Animations.OUT_EXP, 0.15f, Color(140, 140, 145).toConstraint())
+                    setColorAnimation(Animations.OUT_EXP, 0.15f, Color(160, 165, 175).toConstraint())
                 }
             }
         }
@@ -369,10 +395,10 @@ class AnimatedCycleButton(
         background.onMouseEnter {
             if (!isAnimating) {
                 background.animate {
-                    setColorAnimation(Animations.OUT_EXP, 0.2f, Color(55, 55, 58).toConstraint())
+                    setColorAnimation(Animations.OUT_EXP, 0.2f, Color(45, 50, 60).toConstraint()) // Brighter on hover
                 }
                 text.animate {
-                    setColorAnimation(Animations.OUT_EXP, 0.2f, Color.WHITE.toConstraint())
+                    setColorAnimation(Animations.OUT_EXP, 0.2f, Color(255, 255, 255).toConstraint())
                 }
             }
         }
@@ -380,7 +406,7 @@ class AnimatedCycleButton(
         background.onMouseLeave {
             if (!isAnimating) {
                 background.animate {
-                    setColorAnimation(Animations.OUT_EXP, 0.2f, Color(45, 45, 48).toConstraint())
+                    setColorAnimation(Animations.OUT_EXP, 0.2f, Color(35, 38, 45).toConstraint())
                 }
                 text.animate {
                     setColorAnimation(Animations.OUT_EXP, 0.2f, Color(200, 200, 205).toConstraint())
@@ -443,7 +469,7 @@ class AnimatedToggleSwitch(initialState: Boolean) : UIContainer() {
         background = UIRoundedRectangle(14f).constrain {
             width = 100.percent()
             height = 100.percent()
-            color = if (enabled) Color(88, 101, 242).toConstraint() else Color(45, 45, 48).toConstraint()
+            color = if (enabled) Color(34, 197, 94).toConstraint() else Color(55, 55, 58).toConstraint() // Green when enabled
         } childOf this
 
         disabledText = UIText("OFF").constrain {
@@ -498,7 +524,7 @@ class AnimatedToggleSwitch(initialState: Boolean) : UIContainer() {
         enabled = !enabled
         
         val targetX = if (enabled) RelativeConstraint(1f) - 24.pixels() else 2.pixels()
-        val targetColor = if (enabled) Color(88, 101, 242).toConstraint() else Color(45, 45, 48).toConstraint()
+        val targetColor = if (enabled) Color(34, 197, 94).toConstraint() else Color(55, 55, 58).toConstraint()
         
         slider.animate {
             setXAnimation(Animations.OUT_EXP, 0.25f, targetX)
@@ -539,7 +565,7 @@ class KeybindButton(private val getKey: () -> Int, private val onKeySet: (Int) -
         background = UIRoundedRectangle(6f).constrain {
             width = 100.percent()
             height = 100.percent()
-            color = Color(45, 45, 48).toConstraint()
+            color = Color(35, 38, 45).toConstraint() // Darker with blue tint
         } childOf this
 
         keyText = UIText(getKeyName(getKey())).constrain {
@@ -558,7 +584,10 @@ class KeybindButton(private val getKey: () -> Int, private val onKeySet: (Int) -
         onMouseEnter {
             if (!waitingForKey) {
                 background.animate {
-                    setColorAnimation(Animations.OUT_EXP, 0.2f, Color(55, 55, 58).toConstraint())
+                    setColorAnimation(Animations.OUT_EXP, 0.2f, Color(45, 50, 60).toConstraint()) // Brighter on hover
+                }
+                keyText.animate {
+                    setColorAnimation(Animations.OUT_EXP, 0.2f, Color(255, 255, 255).toConstraint())
                 }
             }
         }
@@ -566,7 +595,10 @@ class KeybindButton(private val getKey: () -> Int, private val onKeySet: (Int) -
         onMouseLeave {
             if (!waitingForKey) {
                 background.animate {
-                    setColorAnimation(Animations.OUT_EXP, 0.2f, Color(45, 45, 48).toConstraint())
+                    setColorAnimation(Animations.OUT_EXP, 0.2f, Color(35, 38, 45).toConstraint())
+                }
+                keyText.animate {
+                    setColorAnimation(Animations.OUT_EXP, 0.2f, Color(200, 200, 205).toConstraint())
                 }
             }
         }
@@ -575,8 +607,11 @@ class KeybindButton(private val getKey: () -> Int, private val onKeySet: (Int) -
     private fun startWaitingForKey() {
         waitingForKey = true
         keyText.setText("Press a key...")
+        keyText.animate {
+            setColorAnimation(Animations.OUT_EXP, 0.3f, Color(255, 255, 255).toConstraint())
+        }
         background.animate {
-            setColorAnimation(Animations.OUT_EXP, 0.3f, Color(88, 101, 242).toConstraint())
+            setColorAnimation(Animations.OUT_EXP, 0.3f, Color(255, 193, 7).toConstraint()) // Bright yellow/orange
         }
     }
 
@@ -609,9 +644,12 @@ class KeybindButton(private val getKey: () -> Int, private val onKeySet: (Int) -
             
             onKeySet(finalKeyCode)
             keyText.setText(getKeyName(getKey()))
+            keyText.animate {
+                setColorAnimation(Animations.OUT_EXP, 0.3f, Color(200, 200, 205).toConstraint())
+            }
             
             background.animate {
-                setColorAnimation(Animations.OUT_EXP, 0.3f, Color(45, 45, 48).toConstraint())
+                setColorAnimation(Animations.OUT_EXP, 0.3f, Color(35, 38, 45).toConstraint())
             }
         }
     }
@@ -642,8 +680,8 @@ class FishmasterScreen : WindowScreen(ElementaVersion.V5) {
         mainContainer = UIContainer().constrain {
             x = CenterConstraint()
             y = CenterConstraint()
-            width = 650.pixels()
-            height = 450.pixels()
+            width = 750.pixels()
+            height = 350.pixels()
         } childOf window
 
         // Entrance animation
@@ -655,38 +693,38 @@ class FishmasterScreen : WindowScreen(ElementaVersion.V5) {
         val background = UIRoundedRectangle(12f).constrain {
             width = 100.percent()
             height = 100.percent()
-            color = Color(25, 25, 28).toConstraint()
+            color = Color(15, 15, 18).toConstraint()
         } childOf mainContainer
 
-        // Header with gradient effect
-        val header = UIContainer().constrain {
-            x = 0.pixels()
-            y = 0.pixels()
-            width = 100.percent()
-            height = 60.pixels()
-        } childOf mainContainer
+        // Separate title header (floating above main container)
+        val titleHeader = UIContainer().constrain {
+            x = CenterConstraint()
+            y = CenterConstraint() - 205.pixels() // Position above main container
+            width = 750.pixels()
+            height = 50.pixels()
+        } childOf window
 
-        val headerBackground = UIRoundedRectangle(12f).constrain {
+        val titleHeaderBg = UIRoundedRectangle(8f).constrain {
             width = 100.percent()
             height = 100.percent()
-            color = Color(35, 35, 38).toConstraint()
-        } childOf header
+            color = Color(88, 101, 242).toConstraint()
+        } childOf titleHeader
 
-        // Logo/Icon placeholder
+        // Logo/Icon in title header
         val logoContainer = UIContainer().constrain {
-            x = 20.pixels()
+            x = 15.pixels()
             y = CenterConstraint()
             width = 32.pixels()
             height = 32.pixels()
-        } childOf header
+        } childOf titleHeader
 
         val logo = UIRoundedRectangle(8f).constrain {
             width = 100.percent()
             height = 100.percent()
-            color = Color(88, 101, 242).toConstraint()
+            color = Color(255, 255, 255, 30).toConstraint()
         } childOf logoContainer
 
-        val logoText = UIText("F").constrain {
+        val logoText = UIText("🎣").constrain {
             x = CenterConstraint()
             y = CenterConstraint()
             textScale = 1.2f.pixels()
@@ -694,38 +732,38 @@ class FishmasterScreen : WindowScreen(ElementaVersion.V5) {
         } childOf logo
 
         val title = UIText("FishMaster").constrain {
-            x = 60.pixels()
-            y = CenterConstraint() - 5.pixels()
-            textScale = 1.8f.pixels()
-            color = Color(88, 101, 242).toConstraint()
-        } childOf header
+            x = 55.pixels()
+            y = CenterConstraint() - 6.pixels()
+            textScale = 1.6f.pixels()
+            color = Color.WHITE.toConstraint()
+        } childOf titleHeader
 
         val subtitle = UIText("Advanced Fishing Automation").constrain {
-            x = 60.pixels()
+            x = 55.pixels()
             y = CenterConstraint() + 8.pixels()
-            textScale = 0.8f.pixels()
-            color = Color(140, 140, 145).toConstraint()
-        } childOf header
+            textScale = 0.75f.pixels()
+            color = Color(255, 255, 255, 180).toConstraint()
+        } childOf titleHeader
 
-        // Animated close button
+        // Animated close button in title header
         val closeButton = UIContainer().constrain {
-            x = RelativeConstraint(1f) - 45.pixels()
+            x = RelativeConstraint(1f) - 40.pixels()
             y = CenterConstraint()
             width = 30.pixels()
             height = 30.pixels()
-        } childOf header
+        } childOf titleHeader
 
         val closeButtonBg = UIRoundedRectangle(6f).constrain {
             width = 100.percent()
             height = 100.percent()
-            color = Color(0, 0, 0, 0).toConstraint()
+            color = Color(255, 255, 255, 0).toConstraint()
         } childOf closeButton
 
         val closeButtonText = UIText("✕").constrain {
             x = CenterConstraint()
             y = CenterConstraint()
             textScale = 1.1f.pixels()
-            color = Color(140, 140, 145).toConstraint()
+            color = Color(255, 255, 255, 200).toConstraint()
         } childOf closeButton
 
         closeButton.onMouseClick {
@@ -734,65 +772,65 @@ class FishmasterScreen : WindowScreen(ElementaVersion.V5) {
 
         closeButton.onMouseEnter {
             closeButtonBg.animate {
-                setColorAnimation(Animations.OUT_EXP, 0.2f, Color(220, 53, 69, 20).toConstraint())
+                setColorAnimation(Animations.OUT_EXP, 0.2f, Color(255, 255, 255, 30).toConstraint())
             }
             closeButtonText.animate {
-                setColorAnimation(Animations.OUT_EXP, 0.2f, Color(220, 53, 69).toConstraint())
+                setColorAnimation(Animations.OUT_EXP, 0.2f, Color.WHITE.toConstraint())
             }
         }
 
         closeButton.onMouseLeave {
             closeButtonBg.animate {
-                setColorAnimation(Animations.OUT_EXP, 0.2f, Color(0, 0, 0, 0).toConstraint())
+                setColorAnimation(Animations.OUT_EXP, 0.2f, Color(255, 255, 255, 0).toConstraint())
             }
             closeButtonText.animate {
-                setColorAnimation(Animations.OUT_EXP, 0.2f, Color(140, 140, 145).toConstraint())
+                setColorAnimation(Animations.OUT_EXP, 0.2f, Color(255, 255, 255, 200).toConstraint())
             }
         }
 
-        // Tabs with improved styling
-        val tabsContainer = UIContainer().constrain {
+        // Vertical sidebar for navigation tabs
+        val sidebar = UIContainer().constrain {
             x = 0.pixels()
-            y = 60.pixels()
-            width = 100.percent()
-            height = 45.pixels()
+            y = 0.pixels()
+            width = 140.pixels()
+            height = 100.percent()
         } childOf mainContainer
 
-        val tabsBackground = UIRoundedRectangle(12f).constrain {
+        val sidebarBackground = UIRoundedRectangle(12f).constrain {
             width = 100.percent()
             height = 100.percent()
-            color = Color(30, 30, 33).toConstraint()
-        } childOf tabsContainer
+            color = Color(20, 20, 23).toConstraint()
+        } childOf sidebar
 
-        // Content area with shadow effect
+        // Content area (moved to the right of sidebar)
         contentContainer = UIContainer().constrain {
-            x = 0.pixels()
-            y = 105.pixels()
-            width = 100.percent()
-            height = 100.percent() - 105.pixels()
+            x = 140.pixels()
+            y = 0.pixels()
+            width = 100.percent() - 140.pixels()
+            height = 100.percent()
         } childOf mainContainer
         contentContainer.effect(ScissorEffect())
 
         selectedTabUnderline = UIRoundedRectangle(2f).constrain {
-            x = 15.pixels()
-            y = 100.percent() - 3.pixels()
-            width = 100.pixels()
-            height = 3.pixels()
-            color = Color(88, 101, 242).toConstraint()
-        } childOf tabsContainer
+            x = 0.pixels()
+            y = 15.pixels()
+            width = 4.pixels()
+            height = 40.pixels()
+            color = Color(88, 191, 242).toConstraint() // Bright cyan accent
+        } childOf sidebar
 
-        // Create tabs with animations
+        // Create vertical tabs with animations
         tabs.forEachIndexed { index, tab ->
             val tabButton = UIContainer().constrain {
-                x = (15 + index * 120).pixels()
-                y = 0.pixels()
-                width = 100.pixels()
-                height = 100.percent()
-            } childOf tabsContainer
+                x = 0.pixels()
+                y = (15 + index * 50).pixels()
+                width = 100.percent()
+                height = 40.pixels()
+            } childOf sidebar
             tabsComponents[tab] = tabButton
 
             val tabText = UIText(tab).constrain {
-                x = CenterConstraint()
+                x = 15.pixels()
                 y = CenterConstraint()
                 textScale = 1.0f.pixels()
                 color = if (tab == selectedTab) Color.WHITE.toConstraint() else Color(140, 140, 145).toConstraint()
@@ -859,9 +897,9 @@ class FishmasterScreen : WindowScreen(ElementaVersion.V5) {
             }
         }
 
-        val targetX = (15 + selectedIndex * 120).pixels()
+        val targetY = (15 + selectedIndex * 50).pixels()
         selectedTabUnderline.animate {
-            setXAnimation(Animations.OUT_EXP, 0.3f, targetX)
+            setYAnimation(Animations.OUT_EXP, 0.3f, targetY)
         }
     }
 
@@ -930,14 +968,14 @@ class FishmasterScreen : WindowScreen(ElementaVersion.V5) {
         val settingsButtonBg = UIRoundedRectangle(6f).constrain {
             width = 100.percent()
             height = 100.percent()
-            color = Color(55, 55, 58).toConstraint()
+            color = Color(55, 60, 70).toConstraint() // Bluer tone
         } childOf settingsButton
 
         val settingsIcon = UIText("⚙").constrain {
             x = CenterConstraint()
             y = CenterConstraint()
             textScale = 1.0f.pixels()
-            color = Color(180, 180, 185).toConstraint()
+            color = Color(88, 191, 242).toConstraint() // Bright cyan
         } childOf settingsButton
 
         settingsButton.onMouseClick {
@@ -946,19 +984,19 @@ class FishmasterScreen : WindowScreen(ElementaVersion.V5) {
 
         settingsButton.onMouseEnter {
             settingsButtonBg.animate {
-                setColorAnimation(Animations.OUT_EXP, 0.2f, Color(70, 70, 73).toConstraint())
+                setColorAnimation(Animations.OUT_EXP, 0.2f, Color(70, 80, 95).toConstraint()) // Brighter blue
             }
             settingsIcon.animate {
-                setColorAnimation(Animations.OUT_EXP, 0.2f, Color.WHITE.toConstraint())
+                setColorAnimation(Animations.OUT_EXP, 0.2f, Color(255, 255, 255).toConstraint())
             }
         }
 
         settingsButton.onMouseLeave {
             settingsButtonBg.animate {
-                setColorAnimation(Animations.OUT_EXP, 0.2f, Color(55, 55, 58).toConstraint())
+                setColorAnimation(Animations.OUT_EXP, 0.2f, Color(55, 60, 70).toConstraint())
             }
             settingsIcon.animate {
-                setColorAnimation(Animations.OUT_EXP, 0.2f, Color(180, 180, 185).toConstraint())
+                setColorAnimation(Animations.OUT_EXP, 0.2f, Color(88, 191, 242).toConstraint())
             }
         }
 
@@ -1056,38 +1094,65 @@ class FishmasterScreen : WindowScreen(ElementaVersion.V5) {
         val cardBackground = UIRoundedRectangle(8f).constrain {
             width = 100.percent()
             height = 100.percent()
-            color = Color(35, 35, 38).toConstraint()
+            color = Color(25, 28, 35).toConstraint() // Darker base with blue tint
+        } childOf card
+
+        // Add gradient accent strip
+        val accentStrip = UIRoundedRectangle(8f).constrain {
+            x = 0.pixels()
+            y = 0.pixels()
+            width = 4.pixels()
+            height = 100.percent()
+            color = Color(88, 191, 242).toConstraint() // Bright cyan accent
         } childOf card
 
         val titleText = UIText(title).constrain {
-            x = 20.pixels()
+            x = 25.pixels() // Increased margin for accent strip
             y = 15.pixels()
             textScale = 1.1f.pixels()
-            color = Color.WHITE.toConstraint()
+            color = Color(245, 245, 250).toConstraint() // Slightly warmer white
         } childOf card
 
         val descText = UIText(description).constrain {
-            x = 20.pixels()
+            x = 25.pixels() // Increased margin for accent strip
             y = 35.pixels()
             textScale = 0.8f.pixels()
-            color = Color(140, 140, 145).toConstraint()
+            color = Color(160, 165, 175).toConstraint() // Warmer gray
         } childOf card
 
         control.constrain {
-            x = RelativeConstraint(1f) - 200.pixels() // Increased margin to prevent overflow
+            x = RelativeConstraint(1f) - 200.pixels()
             y = CenterConstraint()
         } childOf card
 
-        // Hover effect
+        // Enhanced hover effect with color transitions
         card.onMouseEnter {
             cardBackground.animate {
-                setColorAnimation(Animations.OUT_EXP, 0.2f, Color(40, 40, 43).toConstraint())
+                setColorAnimation(Animations.OUT_EXP, 0.3f, Color(30, 35, 45).toConstraint())
+            }
+            accentStrip.animate {
+                setColorAnimation(Animations.OUT_EXP, 0.3f, Color(120, 210, 255).toConstraint())
+            }
+            titleText.animate {
+                setColorAnimation(Animations.OUT_EXP, 0.3f, Color.WHITE.toConstraint())
+            }
+            descText.animate {
+                setColorAnimation(Animations.OUT_EXP, 0.3f, Color(180, 185, 195).toConstraint())
             }
         }
 
         card.onMouseLeave {
             cardBackground.animate {
-                setColorAnimation(Animations.OUT_EXP, 0.2f, Color(35, 35, 38).toConstraint())
+                setColorAnimation(Animations.OUT_EXP, 0.3f, Color(25, 28, 35).toConstraint())
+            }
+            accentStrip.animate {
+                setColorAnimation(Animations.OUT_EXP, 0.3f, Color(88, 191, 242).toConstraint())
+            }
+            titleText.animate {
+                setColorAnimation(Animations.OUT_EXP, 0.3f, Color(245, 245, 250).toConstraint())
+            }
+            descText.animate {
+                setColorAnimation(Animations.OUT_EXP, 0.3f, Color(160, 165, 175).toConstraint())
             }
         }
         return card
@@ -1137,14 +1202,14 @@ class FishmasterScreen : WindowScreen(ElementaVersion.V5) {
         val backButtonBg = UIRoundedRectangle(6f).constrain {
             width = 100.percent()
             height = 100.percent()
-            color = Color(45, 45, 48).toConstraint()
+            color = Color(35, 38, 45).toConstraint() // Darker with blue tint
         } childOf backButton
 
         val backArrow = UIText("←").constrain {
             x = CenterConstraint()
             y = CenterConstraint()
             textScale = 1.2f.pixels()
-            color = Color(200, 200, 205).toConstraint()
+            color = Color(88, 191, 242).toConstraint() // Bright cyan
         } childOf backButton
 
         backButton.onMouseClick {
@@ -1153,19 +1218,19 @@ class FishmasterScreen : WindowScreen(ElementaVersion.V5) {
 
         backButton.onMouseEnter {
             backButtonBg.animate {
-                setColorAnimation(Animations.OUT_EXP, 0.2f, Color(55, 55, 58).toConstraint())
+                setColorAnimation(Animations.OUT_EXP, 0.2f, Color(45, 50, 60).toConstraint()) // Brighter on hover
             }
             backArrow.animate {
-                setColorAnimation(Animations.OUT_EXP, 0.2f, Color.WHITE.toConstraint())
+                setColorAnimation(Animations.OUT_EXP, 0.2f, Color(255, 255, 255).toConstraint())
             }
         }
 
         backButton.onMouseLeave {
             backButtonBg.animate {
-                setColorAnimation(Animations.OUT_EXP, 0.2f, Color(45, 45, 48).toConstraint())
+                setColorAnimation(Animations.OUT_EXP, 0.2f, Color(35, 38, 45).toConstraint())
             }
             backArrow.animate {
-                setColorAnimation(Animations.OUT_EXP, 0.2f, Color(200, 200, 205).toConstraint())
+                setColorAnimation(Animations.OUT_EXP, 0.2f, Color(88, 191, 242).toConstraint())
             }
         }
 

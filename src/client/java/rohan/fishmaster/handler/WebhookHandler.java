@@ -2,7 +2,7 @@ package rohan.fishmaster.handler;
 
 import com.google.gson.JsonObject;
 import net.minecraft.client.MinecraftClient;
-import rohan.fishmaster.config.FishMasterConfig;
+import rohan.fishmaster.config.FishMasterConfigNew;
 import rohan.fishmaster.feature.AutoFishingFeature;
 import rohan.fishmaster.feature.SeaCreatureKiller;
 
@@ -52,7 +52,7 @@ public class WebhookHandler {
         System.out.println("[FishMaster] WebhookHandler initialized");
 
         // Send startup message if webhook is enabled
-        if (FishMasterConfig.isWebhookEnabled() && !FishMasterConfig.getWebhookUrl().isEmpty()) {
+        if (FishMasterConfigNew.isWebhookEnabled() && !FishMasterConfigNew.getWebhookUrl().isEmpty()) {
             sendStartupMessage();
             startHealthChecks();
         }
@@ -79,7 +79,7 @@ public class WebhookHandler {
 
         JsonObject field3 = new JsonObject();
         field3.addProperty("name", "Health Check Interval");
-        field3.addProperty("value", (FishMasterConfig.getHealthCheckInterval() / 60000) + " minutes");
+        field3.addProperty("value", (FishMasterConfigNew.getHealthCheckInterval() / 60000) + " minutes");
         field3.addProperty("inline", true);
 
         com.google.gson.JsonArray fields = new com.google.gson.JsonArray();
@@ -103,11 +103,11 @@ public class WebhookHandler {
             healthCheckTask.cancel(false);
         }
 
-        if (!FishMasterConfig.isWebhookEnabled() || FishMasterConfig.getWebhookUrl().isEmpty()) {
+        if (!FishMasterConfigNew.isWebhookEnabled() || FishMasterConfigNew.getWebhookUrl().isEmpty()) {
             return;
         }
 
-        long intervalMs = FishMasterConfig.getHealthCheckInterval();
+        long intervalMs = FishMasterConfigNew.getHealthCheckInterval();
         healthCheckTask = scheduler.scheduleAtFixedRate(this::sendHealthCheck, intervalMs, intervalMs, TimeUnit.MILLISECONDS);
         System.out.println("[FishMaster] Health checks started with interval: " + (intervalMs / 60000) + " minutes");
     }
@@ -202,7 +202,7 @@ public class WebhookHandler {
     }
 
     public void sendTestMessage() {
-        if (!FishMasterConfig.isWebhookEnabled() || FishMasterConfig.getWebhookUrl().isEmpty()) {
+        if (!FishMasterConfigNew.isWebhookEnabled() || FishMasterConfigNew.getWebhookUrl().isEmpty()) {
             System.out.println("[FishMaster] Cannot send test message: Webhook not configured");
             return;
         }
@@ -233,8 +233,8 @@ public class WebhookHandler {
     }
 
     public void sendWebhookMessage(JsonObject embed) {
-        String webhookUrl = FishMasterConfig.getWebhookUrl();
-        if (webhookUrl.isEmpty() || !FishMasterConfig.isWebhookEnabled()) {
+        String webhookUrl = FishMasterConfigNew.getWebhookUrl();
+        if (webhookUrl.isEmpty() || !FishMasterConfigNew.isWebhookEnabled()) {
             return;
         }
 
@@ -266,7 +266,7 @@ public class WebhookHandler {
     }
 
     public void updateWebhookSettings() {
-        if (FishMasterConfig.isWebhookEnabled() && !FishMasterConfig.getWebhookUrl().isEmpty()) {
+        if (FishMasterConfigNew.isWebhookEnabled() && !FishMasterConfigNew.getWebhookUrl().isEmpty()) {
             startHealthChecks();
         } else {
             stopHealthChecks();
@@ -289,7 +289,7 @@ public class WebhookHandler {
      * Perform a health check - called by the responsive scheduler
      */
     public void performHealthCheck() {
-        if (!FishMasterConfig.isWebhookEnabled() || FishMasterConfig.getWebhookUrl().isEmpty()) {
+        if (!FishMasterConfigNew.isWebhookEnabled() || FishMasterConfigNew.getWebhookUrl().isEmpty()) {
             return;
         }
 

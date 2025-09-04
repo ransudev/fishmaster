@@ -11,7 +11,7 @@ import net.minecraft.text.Text;
 import net.minecraft.util.Hand;
 import net.minecraft.util.Formatting;
 import rohan.fishmaster.render.AutoFishingRenderer;
-import rohan.fishmaster.config.FishMasterConfig;
+import rohan.fishmaster.config.FishMasterConfigNew;
 
 public class AutoFishingFeature {
     private static AutoFishingFeature instance;
@@ -42,7 +42,7 @@ public class AutoFishingFeature {
     private static long castStartTime = 0; // Track when casting started for bobber flight delay
     private static final int MAX_CAST_ATTEMPTS = 5;
     private static final long CAST_TIMEOUT = 5000; // 5 seconds to wait for bobber to settle (increased from 3s)
-    // RECAST_DELAY is now configurable via FishMasterConfig.getRecastDelay()
+    // RECAST_DELAY is now configurable via FishMasterConfigNew.getRecastDelay()
     private static final int BOBBER_FLIGHT_DELAY = 10; // 10 ticks (0.5 seconds) for bobber to fly
     private static final long BOBBER_SETTLE_TIMEOUT = 3000; // 3 seconds for bobber to settle in water
     private static final long MIN_RECAST_INTERVAL = 1000; // Minimum 1 second between recast attempts
@@ -151,11 +151,11 @@ public class AutoFishingFeature {
             return false;
         }
 
-        if (FishMasterConfig.isHealthChecksEnabled() &&
-            client.player.getHealth() <= FishMasterConfig.getMinHealthThreshold()) {
-            sendDebugMessage("Pre-start check failed: Health too low (" + client.player.getHealth() + " <= " + FishMasterConfig.getMinHealthThreshold() + ")");
+        if (FishMasterConfigNew.isHealthChecksEnabled() &&
+            client.player.getHealth() <= FishMasterConfigNew.getMinHealthThreshold()) {
+            sendDebugMessage("Pre-start check failed: Health too low (" + client.player.getHealth() + " <= " + FishMasterConfigNew.getMinHealthThreshold() + ")");
             sendFailsafeMessage("Cannot start: Player health too low (≤" +
-                (FishMasterConfig.getMinHealthThreshold() / 2) + " hearts)", true);
+                (FishMasterConfigNew.getMinHealthThreshold() / 2) + " hearts)", true);
             return false;
         }
 
@@ -350,7 +350,7 @@ public class AutoFishingFeature {
                 if (client.player.fishHook == null) {
                     sendDebugMessage("Bobber disappeared - resetting state");
                     resetFishingState();
-                    delayTimer = (int) FishMasterConfig.getRecastDelay();
+                    delayTimer = (int) FishMasterConfigNew.getRecastDelay();
                 } else if (hasBobberInWater(client.player)) {
                     // Only check for fish bites after minimum fishing time has passed
                     long timeFishing = System.currentTimeMillis() - fishingStartTime;
@@ -363,8 +363,8 @@ public class AutoFishingFeature {
                             // Set flag to indicate successful catch and reset state
                             justCaughtFish = true;
                             resetFishingState();
-                            delayTimer = (int) FishMasterConfig.getRecastDelay(); // Use configurable delay
-                            sendDebugMessage("Fish caught - waiting " + FishMasterConfig.getRecastDelay() + " ticks before next cast");
+                            delayTimer = (int) FishMasterConfigNew.getRecastDelay(); // Use configurable delay
+                            sendDebugMessage("Fish caught - waiting " + FishMasterConfigNew.getRecastDelay() + " ticks before next cast");
                         }
                     } else if (timeFishing < MIN_FISHING_TICKS * 50) {
                         // Still waiting for minimum fishing time
@@ -387,14 +387,14 @@ public class AutoFishingFeature {
         MinecraftClient client = MinecraftClient.getInstance();
 
         // Skip health checks if disabled in config
-        if (!FishMasterConfig.isHealthChecksEnabled()) {
+        if (!FishMasterConfigNew.isHealthChecksEnabled()) {
             sendDebugMessage("Health checks disabled in config - skipping");
             return true;
         }
 
         // Check player health
         float currentHealth = client.player.getHealth();
-        float threshold = FishMasterConfig.getMinHealthThreshold() - 2.0f;
+        float threshold = FishMasterConfigNew.getMinHealthThreshold() - 2.0f;
         if (currentHealth <= threshold) {
             sendDebugMessage("Health check failed - Current: " + currentHealth + ", Threshold: " + threshold);
             emergencyStopWithReason("Player health critically low (≤" + (threshold / 2) + " hearts)");
@@ -652,7 +652,7 @@ public class AutoFishingFeature {
                 castStartTime = currentTime;
 
                 // If too many consecutive failures, trigger emergency stop
-                if (consecutiveFailures >= Math.max(3, FishMasterConfig.getMaxConsecutiveFailures() / 2)) {
+                if (consecutiveFailures >= Math.max(3, FishMasterConfigNew.getMaxConsecutiveFailures() / 2)) {
                     emergencyStopWithReason("Too many failed cast attempts - possible obstruction or invalid fishing area");
                     return;
                 }
@@ -683,7 +683,7 @@ public class AutoFishingFeature {
                         Hand hand = client.player.getStackInHand(Hand.MAIN_HAND).getItem() instanceof FishingRodItem ?
                                    Hand.MAIN_HAND : Hand.OFF_HAND;
                         client.interactionManager.interactItem(client.player, hand);
-                        delayTimer = (int) FishMasterConfig.getRecastDelay(); // Use configurable delay
+                        delayTimer = (int) FishMasterConfigNew.getRecastDelay(); // Use configurable delay
                         lastCastTime = currentTime;
                         castAttempts++;
                         sendDebugMessage("Reeled in bobber due to settle timeout - Attempt: " + castAttempts);

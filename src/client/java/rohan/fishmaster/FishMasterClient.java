@@ -3,7 +3,7 @@ package rohan.fishmaster;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
-import rohan.fishmaster.config.FishMasterConfig;
+import rohan.fishmaster.config.FishMasterConfigNew;
 import rohan.fishmaster.handler.ClientTickHandler;
 import rohan.fishmaster.handler.DisconnectHandler;
 import rohan.fishmaster.handler.WebhookHandler;
@@ -23,8 +23,8 @@ public class FishMasterClient implements ClientModInitializer {
         }
 
         try {
-            // Load config first
-            FishMasterConfig.load();
+            // Load enhanced config first
+            FishMasterConfigNew.load();
 
             // Initialize keybindings FIRST - this is critical for preventing the crash
             KeyBindings.register();
@@ -45,8 +45,10 @@ public class FishMasterClient implements ClientModInitializer {
             DisconnectHandler.initialize();
             WebhookHandler.getInstance().initialize();
 
-            // Add shutdown hook for webhook handler
+            // Add shutdown hooks for proper cleanup and config saving
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                System.out.println("[FishMaster] Shutting down, saving config...");
+                FishMasterConfigNew.saveAndShutdown();
                 WebhookHandler.getInstance().shutdown();
             }));
 
@@ -61,7 +63,7 @@ public class FishMasterClient implements ClientModInitializer {
             });
 
             initialized = true;
-            System.out.println("[FishMaster] Core mod initialized successfully!");
+            System.out.println("[FishMaster] Core mod initialized successfully with enhanced config system!");
 
         } catch (Exception e) {
             System.err.println("[FishMaster] Failed to initialize core mod: " + e.getMessage());

@@ -12,7 +12,7 @@ import net.minecraft.util.Hand;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
-import rohan.fishmaster.config.FishMasterConfig;
+import rohan.fishmaster.config.FishMasterConfigNew;
 import rohan.fishmaster.feature.seacreaturekiller.*;
 import rohan.fishmaster.utils.AngleUtils;
 
@@ -149,7 +149,7 @@ public class SeaCreatureKiller {
 
     public static void toggle() {
         enabled = !enabled;
-        FishMasterConfig.setSeaCreatureKillerEnabled(enabled);
+        FishMasterConfigNew.setSeaCreatureKillerEnabled(enabled);
 
         String status = enabled ? "ENABLED" : "DISABLED";
         MinecraftClient.getInstance().player.sendMessage(Text.literal("[FishMaster] Sea Creature Killer: " + status).formatted(enabled ? Formatting.GREEN : Formatting.RED), false);
@@ -162,7 +162,7 @@ public class SeaCreatureKiller {
     public static void setEnabled(boolean newState) {
         if (enabled != newState) {
             enabled = newState;
-            FishMasterConfig.setSeaCreatureKillerEnabled(enabled);
+            FishMasterConfigNew.setSeaCreatureKillerEnabled(enabled);
 
             if (MinecraftClient.getInstance().player != null) {
                 String status = enabled ? "ENABLED" : "DISABLED";
@@ -203,7 +203,7 @@ public class SeaCreatureKiller {
      * Updates the current mode based on config setting
      */
     private static void updateMode() {
-        String mode = FishMasterConfig.getSeaCreatureKillerMode();
+        String mode = FishMasterConfigNew.getSeaCreatureKillerMode();
         switch (mode) {
             case "Fire Veil Wand":
                 currentMode = fireVeilWandMode;
@@ -288,7 +288,7 @@ public class SeaCreatureKiller {
             originalPitch = client.player.getPitch();
             originalSlot = client.player.getInventory().getSelectedSlot();
 
-            String mode = FishMasterConfig.getSeaCreatureKillerMode();
+            String mode = FishMasterConfigNew.getSeaCreatureKillerMode();
 
             if ("RCM".equals(mode)) {
                 // Start transition to look at ground for RCM mode
@@ -548,7 +548,7 @@ public class SeaCreatureKiller {
     }
 
     public static void init() {
-        enabled = FishMasterConfig.isSeaCreatureKillerEnabled();
+        enabled = FishMasterConfigNew.isSeaCreatureKillerEnabled();
         updateMode();
     }
 

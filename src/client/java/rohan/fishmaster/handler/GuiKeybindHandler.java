@@ -3,7 +3,7 @@ package rohan.fishmaster.handler;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.minecraft.client.MinecraftClient;
 import org.lwjgl.glfw.GLFW;
-import rohan.fishmaster.config.FishMasterConfig;
+import rohan.fishmaster.config.FishMasterConfigNew;
 import rohan.fishmaster.feature.AutoFishingFeature;
 
 public class GuiKeybindHandler {
@@ -24,7 +24,7 @@ public class GuiKeybindHandler {
         // Don't trigger keybind if any screen is open (especially our GUI)
         if (client.currentScreen != null) return;
 
-        int autoFishKey = FishMasterConfig.getAutoFishingKeybind();
+        int autoFishKey = FishMasterConfigNew.getAutoFishingKeybind();
         if (autoFishKey == GLFW.GLFW_KEY_UNKNOWN) return;
 
         // Check if the auto-fishing key is currently pressed
