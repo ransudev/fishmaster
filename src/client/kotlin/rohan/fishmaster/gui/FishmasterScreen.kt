@@ -317,7 +317,7 @@ class AnimatedCycleButton(
         background = UIRoundedRectangle(6f).constrain {
             width = 100.percent()
             height = 100.percent()
-            color = Color(35, 38, 45).toConstraint() // Darker with blue tint
+            color = Color(35, 38, 45).toConstraint() // Fully opaque buttons
         } childOf this
 
         leftArrow = UIText("◀").constrain {
@@ -395,7 +395,7 @@ class AnimatedCycleButton(
         background.onMouseEnter {
             if (!isAnimating) {
                 background.animate {
-                    setColorAnimation(Animations.OUT_EXP, 0.2f, Color(45, 50, 60).toConstraint()) // Brighter on hover
+                    setColorAnimation(Animations.OUT_EXP, 0.2f, Color(45, 50, 60).toConstraint()) // Fully opaque hover
                 }
                 text.animate {
                     setColorAnimation(Animations.OUT_EXP, 0.2f, Color(255, 255, 255).toConstraint())
@@ -406,7 +406,7 @@ class AnimatedCycleButton(
         background.onMouseLeave {
             if (!isAnimating) {
                 background.animate {
-                    setColorAnimation(Animations.OUT_EXP, 0.2f, Color(35, 38, 45).toConstraint())
+                    setColorAnimation(Animations.OUT_EXP, 0.2f, Color(35, 38, 45).toConstraint()) // Back to fully opaque
                 }
                 text.animate {
                     setColorAnimation(Animations.OUT_EXP, 0.2f, Color(200, 200, 205).toConstraint())
@@ -469,7 +469,7 @@ class AnimatedToggleSwitch(initialState: Boolean) : UIContainer() {
         background = UIRoundedRectangle(14f).constrain {
             width = 100.percent()
             height = 100.percent()
-            color = if (enabled) Color(34, 197, 94).toConstraint() else Color(55, 55, 58).toConstraint() // Green when enabled
+            color = if (enabled) Color(34, 197, 94).toConstraint() else Color(55, 55, 58).toConstraint() // Fully opaque buttons
         } childOf this
 
         disabledText = UIText("OFF").constrain {
@@ -524,7 +524,7 @@ class AnimatedToggleSwitch(initialState: Boolean) : UIContainer() {
         enabled = !enabled
         
         val targetX = if (enabled) RelativeConstraint(1f) - 24.pixels() else 2.pixels()
-        val targetColor = if (enabled) Color(34, 197, 94).toConstraint() else Color(55, 55, 58).toConstraint()
+        val targetColor = if (enabled) Color(34, 197, 94).toConstraint() else Color(55, 55, 58).toConstraint() // Fully opaque
         
         slider.animate {
             setXAnimation(Animations.OUT_EXP, 0.25f, targetX)
@@ -565,7 +565,7 @@ class KeybindButton(private val getKey: () -> Int, private val onKeySet: (Int) -
         background = UIRoundedRectangle(6f).constrain {
             width = 100.percent()
             height = 100.percent()
-            color = Color(35, 38, 45).toConstraint() // Darker with blue tint
+            color = Color(35, 38, 45, 160).toConstraint() // Added transparency
         } childOf this
 
         keyText = UIText(getKeyName(getKey())).constrain {
@@ -584,7 +584,7 @@ class KeybindButton(private val getKey: () -> Int, private val onKeySet: (Int) -
         onMouseEnter {
             if (!waitingForKey) {
                 background.animate {
-                    setColorAnimation(Animations.OUT_EXP, 0.2f, Color(45, 50, 60).toConstraint()) // Brighter on hover
+                    setColorAnimation(Animations.OUT_EXP, 0.2f, Color(45, 50, 60, 200).toConstraint()) // More opaque on hover
                 }
                 keyText.animate {
                     setColorAnimation(Animations.OUT_EXP, 0.2f, Color(255, 255, 255).toConstraint())
@@ -595,7 +595,7 @@ class KeybindButton(private val getKey: () -> Int, private val onKeySet: (Int) -
         onMouseLeave {
             if (!waitingForKey) {
                 background.animate {
-                    setColorAnimation(Animations.OUT_EXP, 0.2f, Color(35, 38, 45).toConstraint())
+                    setColorAnimation(Animations.OUT_EXP, 0.2f, Color(35, 38, 45, 160).toConstraint()) // Back to translucent
                 }
                 keyText.animate {
                     setColorAnimation(Animations.OUT_EXP, 0.2f, Color(200, 200, 205).toConstraint())
@@ -693,7 +693,7 @@ class FishmasterScreen : WindowScreen(ElementaVersion.V5) {
         val background = UIRoundedRectangle(12f).constrain {
             width = 100.percent()
             height = 100.percent()
-            color = Color(15, 15, 18).toConstraint()
+            color = Color(15, 15, 18, 180).toConstraint() // Added transparency (180/255 = ~70% opacity)
         } childOf mainContainer
 
         // Separate title header (floating above main container)
@@ -707,7 +707,7 @@ class FishmasterScreen : WindowScreen(ElementaVersion.V5) {
         val titleHeaderBg = UIRoundedRectangle(8f).constrain {
             width = 100.percent()
             height = 100.percent()
-            color = Color(88, 101, 242).toConstraint()
+            color = Color(88, 101, 242, 200).toConstraint() // Made slightly translucent
         } childOf titleHeader
 
         // Logo/Icon in title header
@@ -799,7 +799,7 @@ class FishmasterScreen : WindowScreen(ElementaVersion.V5) {
         val sidebarBackground = UIRoundedRectangle(12f).constrain {
             width = 100.percent()
             height = 100.percent()
-            color = Color(20, 20, 23).toConstraint()
+            color = Color(20, 20, 23, 160).toConstraint() // Added transparency
         } childOf sidebar
 
         // Content area (moved to the right of sidebar)
@@ -1094,7 +1094,7 @@ class FishmasterScreen : WindowScreen(ElementaVersion.V5) {
         val cardBackground = UIRoundedRectangle(8f).constrain {
             width = 100.percent()
             height = 100.percent()
-            color = Color(25, 28, 35).toConstraint() // Darker base with blue tint
+            color = Color(25, 28, 35, 150).toConstraint() // Added transparency to feature cards
         } childOf card
 
         // Add gradient accent strip
@@ -1128,7 +1128,7 @@ class FishmasterScreen : WindowScreen(ElementaVersion.V5) {
         // Enhanced hover effect with color transitions
         card.onMouseEnter {
             cardBackground.animate {
-                setColorAnimation(Animations.OUT_EXP, 0.3f, Color(30, 35, 45).toConstraint())
+                setColorAnimation(Animations.OUT_EXP, 0.3f, Color(30, 35, 45, 180).toConstraint()) // Slightly more opaque on hover
             }
             accentStrip.animate {
                 setColorAnimation(Animations.OUT_EXP, 0.3f, Color(120, 210, 255).toConstraint())
@@ -1143,7 +1143,7 @@ class FishmasterScreen : WindowScreen(ElementaVersion.V5) {
 
         card.onMouseLeave {
             cardBackground.animate {
-                setColorAnimation(Animations.OUT_EXP, 0.3f, Color(25, 28, 35).toConstraint())
+                setColorAnimation(Animations.OUT_EXP, 0.3f, Color(25, 28, 35, 150).toConstraint()) // Back to translucent
             }
             accentStrip.animate {
                 setColorAnimation(Animations.OUT_EXP, 0.3f, Color(88, 191, 242).toConstraint())
