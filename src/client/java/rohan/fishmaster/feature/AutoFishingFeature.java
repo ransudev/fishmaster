@@ -42,7 +42,7 @@ public class AutoFishingFeature {
     private static long castStartTime = 0; // Track when casting started for bobber flight delay
     private static final int MAX_CAST_ATTEMPTS = 5;
     private static final long CAST_TIMEOUT = 5000; // 5 seconds to wait for bobber to settle (increased from 3s)
-    private static final int RECAST_DELAY = 2; // Fixed 2 ticks delay for both SCK on and off
+    // RECAST_DELAY is now configurable via FishMasterConfig.getRecastDelay()
     private static final int BOBBER_FLIGHT_DELAY = 10; // 10 ticks (0.5 seconds) for bobber to fly
     private static final long BOBBER_SETTLE_TIMEOUT = 3000; // 3 seconds for bobber to settle in water
     private static final long MIN_RECAST_INTERVAL = 1000; // Minimum 1 second between recast attempts
@@ -350,7 +350,7 @@ public class AutoFishingFeature {
                 if (client.player.fishHook == null) {
                     sendDebugMessage("Bobber disappeared - resetting state");
                     resetFishingState();
-                    delayTimer = 20;
+                    delayTimer = (int) FishMasterConfig.getRecastDelay();
                 } else if (hasBobberInWater(client.player)) {
                     // Only check for fish bites after minimum fishing time has passed
                     long timeFishing = System.currentTimeMillis() - fishingStartTime;
@@ -363,8 +363,8 @@ public class AutoFishingFeature {
                             // Set flag to indicate successful catch and reset state
                             justCaughtFish = true;
                             resetFishingState();
-                            delayTimer = 20; // Wait 20 ticks before next cast
-                            sendDebugMessage("Fish caught - waiting " + 20 + " ticks before next cast");
+                            delayTimer = (int) FishMasterConfig.getRecastDelay(); // Use configurable delay
+                            sendDebugMessage("Fish caught - waiting " + FishMasterConfig.getRecastDelay() + " ticks before next cast");
                         }
                     } else if (timeFishing < MIN_FISHING_TICKS * 50) {
                         // Still waiting for minimum fishing time
@@ -683,7 +683,7 @@ public class AutoFishingFeature {
                         Hand hand = client.player.getStackInHand(Hand.MAIN_HAND).getItem() instanceof FishingRodItem ?
                                    Hand.MAIN_HAND : Hand.OFF_HAND;
                         client.interactionManager.interactItem(client.player, hand);
-                        delayTimer = RECAST_DELAY; // Wait before recasting
+                        delayTimer = (int) FishMasterConfig.getRecastDelay(); // Use configurable delay
                         lastCastTime = currentTime;
                         castAttempts++;
                         sendDebugMessage("Reeled in bobber due to settle timeout - Attempt: " + castAttempts);

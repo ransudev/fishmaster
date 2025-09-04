@@ -62,6 +62,20 @@ private object ConfigBridge {
             m.invoke(null, mode)
         } catch (_: Throwable) { }
     }
+
+    fun getRecastDelay(): Float = try {
+        val c = clazz() ?: return 20f // Default 20 ticks (1 second)
+        val m = c.getMethod("getRecastDelay")
+        (m.invoke(null) as? Float) ?: 20f
+    } catch (_: Throwable) { 20f }
+
+    fun setRecastDelay(delay: Float) {
+        try {
+            val c = clazz() ?: return
+            val m = c.getMethod("setRecastDelay", Float::class.javaPrimitiveType)
+            m.invoke(null, delay)
+        } catch (_: Throwable) { }
+    }
 }
 
 class AnimatedDropdown(
@@ -410,7 +424,7 @@ class AnimatedCycleButton(
     }
 }
 
-class AnimatedToggleSwitch(initialState: Boolean) : UIComponent() {
+class AnimatedToggleSwitch(initialState: Boolean) : UIContainer() {
     private var enabled = initialState
     private val background: UIComponent
     private val slider: UIComponent
@@ -511,7 +525,7 @@ class AnimatedToggleSwitch(initialState: Boolean) : UIComponent() {
     }
 }
 
-class KeybindButton(private val getKey: () -> Int, private val onKeySet: (Int) -> Unit) : UIComponent() {
+class KeybindButton(private val getKey: () -> Int, private val onKeySet: (Int) -> Unit) : UIContainer() {
     private var waitingForKey = false
     private val keyText: UIText
     private val background: UIComponent
@@ -615,6 +629,9 @@ class FishmasterScreen : WindowScreen(ElementaVersion.V5) {
     private val selectedTabUnderline: UIComponent
     private val mainContainer: UIComponent
     private var isClosing = false
+    
+    // Page navigation variables
+    private var currentPage = "main" // "main" or "autofish-settings"
 
     init {
         // Save the previous GUI scale
@@ -861,6 +878,13 @@ class FishmasterScreen : WindowScreen(ElementaVersion.V5) {
 
     private fun showTab(tab: String) {
         contentContainer.clearChildren()
+        
+        // Check if we're in a sub-page
+        if (currentPage == "autofish-settings") {
+            createAutoFishSettingsPage()
+            return
+        }
+        
         // Only reset keybindButton if not on Main tab
         if (tab != "Main") keybindButton = null
 
@@ -887,13 +911,56 @@ class FishmasterScreen : WindowScreen(ElementaVersion.V5) {
             height = 100.percent() - 40.pixels()
         } childOf contentWrapper
 
-        createFeatureCard(
+        val autoFishCard = createFeatureCard(
             scrollContainer,
             "Auto Fishing",
             "Configure your automatic fishing keybind",
             0.pixels(),
             createKeybindControl()
         )
+
+        // Add a small settings button next to the keybind button
+        val settingsButton = UIContainer().constrain {
+            x = RelativeConstraint(1f) - 240.pixels() // Positioned just left of the keybind button
+            y = CenterConstraint()
+            width = 28.pixels()
+            height = 28.pixels()
+        } childOf autoFishCard
+
+        val settingsButtonBg = UIRoundedRectangle(6f).constrain {
+            width = 100.percent()
+            height = 100.percent()
+            color = Color(55, 55, 58).toConstraint()
+        } childOf settingsButton
+
+        val settingsIcon = UIText("⚙").constrain {
+            x = CenterConstraint()
+            y = CenterConstraint()
+            textScale = 1.0f.pixels()
+            color = Color(180, 180, 185).toConstraint()
+        } childOf settingsButton
+
+        settingsButton.onMouseClick {
+            openAutoFishSettings()
+        }
+
+        settingsButton.onMouseEnter {
+            settingsButtonBg.animate {
+                setColorAnimation(Animations.OUT_EXP, 0.2f, Color(70, 70, 73).toConstraint())
+            }
+            settingsIcon.animate {
+                setColorAnimation(Animations.OUT_EXP, 0.2f, Color.WHITE.toConstraint())
+            }
+        }
+
+        settingsButton.onMouseLeave {
+            settingsButtonBg.animate {
+                setColorAnimation(Animations.OUT_EXP, 0.2f, Color(55, 55, 58).toConstraint())
+            }
+            settingsIcon.animate {
+                setColorAnimation(Animations.OUT_EXP, 0.2f, Color(180, 180, 185).toConstraint())
+            }
+        }
 
         val toggle = createToggleControl(ConfigBridge.isSeaCreatureKillerEnabled()) { }
         
@@ -946,12 +1013,36 @@ class FishmasterScreen : WindowScreen(ElementaVersion.V5) {
     }
 
     private fun createExtrasTabContent() {
-        val label = UIText("Extra Features").constrain {
-            x = CenterConstraint()
-            y = CenterConstraint()
-            textScale = 1.2f.pixels()
-            color = Color(140, 140, 145).toConstraint()
+        val contentWrapper = UIContainer().constrain {
+            x = 0.pixels()
+            y = 0.pixels()
+            width = 100.percent()
+            height = 100.percent()
         } childOf contentContainer
+
+        val scrollContainer = UIContainer().constrain {
+            x = 30.pixels()
+            y = 20.pixels()
+            width = 100.percent() - 60.pixels()
+            height = 100.percent() - 40.pixels()
+        } childOf contentWrapper
+
+        // Auto Harp Feature
+        val autoHarpToggle = createToggleControl(
+            rohan.fishmaster.qol.AutoHarp.isEnabled()
+        ) { newState ->
+            if (newState != rohan.fishmaster.qol.AutoHarp.isEnabled()) {
+                rohan.fishmaster.qol.AutoHarp.toggle()
+            }
+        }
+
+        createFeatureCard(
+            scrollContainer,
+            "Auto Harp",
+            "Automatically complete Melody's Harp minigame",
+            0.pixels(),
+            autoHarpToggle
+        )
     }
 
     private fun createFeatureCard(parent: UIComponent, title: String, description: String, yConstraint: YConstraint, control: UIComponent): UIComponent {
@@ -983,7 +1074,7 @@ class FishmasterScreen : WindowScreen(ElementaVersion.V5) {
         } childOf card
 
         control.constrain {
-            x = RelativeConstraint(1f) - 20.pixels() - 140.pixels()
+            x = RelativeConstraint(1f) - 200.pixels() // Increased margin to prevent overflow
             y = CenterConstraint()
         } childOf card
 
@@ -1015,6 +1106,103 @@ class FishmasterScreen : WindowScreen(ElementaVersion.V5) {
         return AnimatedToggleSwitch(initialState).apply {
             this.onStateChange = onStateChange
         }
+    }
+
+    private fun openAutoFishSettings() {
+        currentPage = "autofish-settings"
+        showTab(selectedTab) // This will trigger the settings page creation
+    }
+
+    private fun goBackToMainTab() {
+        currentPage = "main"
+        showTab(selectedTab) // This will show the normal tab content
+    }
+
+    private fun createAutoFishSettingsPage() {
+        val contentWrapper = UIContainer().constrain {
+            x = 0.pixels()
+            y = 0.pixels()
+            width = 100.percent()
+            height = 100.percent()
+        } childOf contentContainer
+
+        // Back button
+        val backButton = UIContainer().constrain {
+            x = 20.pixels()
+            y = 15.pixels()
+            width = 40.pixels()
+            height = 30.pixels()
+        } childOf contentWrapper
+
+        val backButtonBg = UIRoundedRectangle(6f).constrain {
+            width = 100.percent()
+            height = 100.percent()
+            color = Color(45, 45, 48).toConstraint()
+        } childOf backButton
+
+        val backArrow = UIText("←").constrain {
+            x = CenterConstraint()
+            y = CenterConstraint()
+            textScale = 1.2f.pixels()
+            color = Color(200, 200, 205).toConstraint()
+        } childOf backButton
+
+        backButton.onMouseClick {
+            goBackToMainTab()
+        }
+
+        backButton.onMouseEnter {
+            backButtonBg.animate {
+                setColorAnimation(Animations.OUT_EXP, 0.2f, Color(55, 55, 58).toConstraint())
+            }
+            backArrow.animate {
+                setColorAnimation(Animations.OUT_EXP, 0.2f, Color.WHITE.toConstraint())
+            }
+        }
+
+        backButton.onMouseLeave {
+            backButtonBg.animate {
+                setColorAnimation(Animations.OUT_EXP, 0.2f, Color(45, 45, 48).toConstraint())
+            }
+            backArrow.animate {
+                setColorAnimation(Animations.OUT_EXP, 0.2f, Color(200, 200, 205).toConstraint())
+            }
+        }
+
+        // Page title
+        val title = UIText("Auto Fishing Settings").constrain {
+            x = 80.pixels()
+            y = 20.pixels()
+            textScale = 1.4f.pixels()
+            color = Color.WHITE.toConstraint()
+        } childOf contentWrapper
+
+        // Settings container
+        val settingsContainer = UIContainer().constrain {
+            x = 30.pixels()
+            y = 70.pixels()
+            width = 100.percent() - 60.pixels()
+            height = 100.percent() - 100.pixels()
+        } childOf contentWrapper
+
+        // Recast delay setting with cycle button
+        val delayOptions = (100..1500 step 50).map { "${it}ms" } // Creates: ["100ms", "150ms", "200ms", ..., "1500ms"]
+        val currentDelayMs = (ConfigBridge.getRecastDelay() * 50f).toInt()
+        val currentDelayText = "${currentDelayMs}ms"
+        val initialDelay = if (delayOptions.contains(currentDelayText)) currentDelayText else "250ms"
+        
+        val recastDelayButton = AnimatedCycleButton(delayOptions, initialDelay) { selected ->
+            val delayMs = selected.removeSuffix("ms").toFloat()
+            ConfigBridge.setRecastDelay(delayMs / 50f) // Convert milliseconds back to ticks
+        }
+
+        createFeatureCard(
+            settingsContainer,
+            "Recast Delay",
+            "Delay between fishing rod casts (lower = faster)",
+            0.pixels(),
+            recastDelayButton
+        )
     }
 
     private fun createModeSelector(): UIComponent {

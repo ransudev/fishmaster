@@ -32,6 +32,7 @@ public class FishMasterConfig {
     private static boolean seaCreatureKillerEnabled = false;
     private static String seaCreatureKillerMode = "default";
     private static int autoFishingKeybind = GLFW.GLFW_KEY_B; // Default keybind set to 'B'
+    private static float recastDelay = 20f; // Default 20 ticks (1 second)
     public static int devMKillDist = 100;
     public static int devMKillRot = 100;
 
@@ -75,6 +76,7 @@ public class FishMasterConfig {
                 seaCreatureKillerEnabled = config.seaCreatureKillerEnabled;
                 seaCreatureKillerMode = config.seaCreatureKillerMode != null ? config.seaCreatureKillerMode : "default";
                 autoFishingKeybind = config.autoFishingKeybind;
+                recastDelay = config.recastDelay > 0 ? config.recastDelay : 20f;
                 devMKillDist = config.devMKillDist;
                 devMKillRot = config.devMKillRot;
             }
@@ -109,6 +111,7 @@ public class FishMasterConfig {
             configData.seaCreatureKillerEnabled = seaCreatureKillerEnabled;
             configData.seaCreatureKillerMode = seaCreatureKillerMode;
             configData.autoFishingKeybind = autoFishingKeybind;
+            configData.recastDelay = recastDelay;
             configData.devMKillDist = devMKillDist;
             configData.devMKillRot = devMKillRot;
 
@@ -138,6 +141,7 @@ public class FishMasterConfig {
         public boolean seaCreatureKillerEnabled;
         public String seaCreatureKillerMode;
         public int autoFishingKeybind;
+        public float recastDelay;
         public int devMKillDist;
         public int devMKillRot;
     }
@@ -159,6 +163,7 @@ public class FishMasterConfig {
     public static boolean isSeaCreatureKillerEnabled() { return seaCreatureKillerEnabled; }
     public static String getSeaCreatureKillerMode() { return seaCreatureKillerMode; }
     public static int getAutoFishingKeybind() { return autoFishingKeybind; }
+    public static float getRecastDelay() { return recastDelay; }
 
     public static void setAutoFishingKeybind(int keyCode) {
         autoFishingKeybind = keyCode;
@@ -240,6 +245,11 @@ public class FishMasterConfig {
 
     public static void setSeaCreatureKillerMode(String mode) {
         seaCreatureKillerMode = mode;
+        save();
+    }
+
+    public static void setRecastDelay(float delay) {
+        recastDelay = Math.max(5f, Math.min(100f, delay)); // Clamp between 5-100 ticks
         save();
     }
 }
