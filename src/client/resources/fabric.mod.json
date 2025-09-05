@@ -1,9 +1,8 @@
 {
   "schemaVersion": 1,
-  "id": "fishmaster",
-  "version": "1.0.0",
-  "name": "Fish Master",
-  "description": "Advanced auto fishing and sea creature killer for Hypixel Skyblock",
+  "id": "skyblocker",
+  "name": "fishmaster",
+  "description": "Advanced Hypixel Skyblock utilities and enhancements",
   "authors": [
     "Rohan"
   ],
@@ -12,7 +11,7 @@
     "sources": ""
   },
   "license": "MIT",
-  "icon": "assets/fishmaster/icon.png",
+  "icon": "assets/skyblocker/icon.png",
   "environment": "client",
   "entrypoints": {
     "client": [
@@ -39,8 +38,8 @@
     "modmenu": {
       "badges": ["client"],
       "parent": {
-        "id": "fishmaster",
-        "name": "Fish Master",
+        "id": "skyblocker",
+        "name": "Skyblocker",
         "badges": ["client"]
       }
     }

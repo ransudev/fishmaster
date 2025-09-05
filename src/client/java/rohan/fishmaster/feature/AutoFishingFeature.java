@@ -10,7 +10,6 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.text.Text;
 import net.minecraft.util.Hand;
 import net.minecraft.util.Formatting;
-import rohan.fishmaster.render.AutoFishingRenderer;
 import rohan.fishmaster.config.FishMasterConfigNew;
 
 public class AutoFishingFeature {
@@ -20,6 +19,7 @@ public class AutoFishingFeature {
     private static boolean isFishing = false;
     private static int delayTimer = 0;
     private static int castCooldownTimer = 0;
+    private static int reelingDelayTimer = 0; // New timer for reeling delay
     private static long lastDetectionTime = 0;
     private static boolean mouseWasGrabbed = false;
 
@@ -314,6 +314,23 @@ public class AutoFishingFeature {
             }
         }
 
+        if (reelingDelayTimer > 0) {
+            reelingDelayTimer--;
+            if (reelingDelayTimer % 10 == 0) { // Debug message every half second
+                sendDebugMessage("Reeling delay timer: " + reelingDelayTimer + " ticks remaining");
+            }
+            if (reelingDelayTimer == 0) {
+                // Timer expired, now reel in the fish
+                sendDebugMessage("Reeling delay completed - reeling in fish!");
+                performSingleClick(client);
+                justCaughtFish = true;
+                resetFishingState();
+                delayTimer = (int) FishMasterConfigNew.getRecastDelay();
+                sendDebugMessage("Fish reeled in - waiting " + FishMasterConfigNew.getRecastDelay() + " ticks before next cast");
+            }
+            return; // Don't continue with other logic while waiting to reel in
+        }
+
         switch (currentState) {
             case IDLE:
                 if (client.player.fishHook == null) {
@@ -352,25 +369,25 @@ public class AutoFishingFeature {
                     resetFishingState();
                     delayTimer = (int) FishMasterConfigNew.getRecastDelay();
                 } else if (hasBobberInWater(client.player)) {
-                    // Only check for fish bites after minimum fishing time has passed
-                    long timeFishing = System.currentTimeMillis() - fishingStartTime;
-                    if (timeFishing >= MIN_FISHING_TICKS * 50 && detectArmorStandFishBite(client)) {
-                        long currentTimeMillis = System.currentTimeMillis();
-                        if (currentTimeMillis - lastDetectionTime >= DETECTION_COOLDOWN) {
-                            lastDetectionTime = currentTimeMillis;
-                            sendDebugMessage("Fish detected after " + timeFishing + "ms of fishing! Reeling in...");
-                            performSingleClick(client);
-                            // Set flag to indicate successful catch and reset state
-                            justCaughtFish = true;
-                            resetFishingState();
-                            delayTimer = (int) FishMasterConfigNew.getRecastDelay(); // Use configurable delay
-                            sendDebugMessage("Fish caught - waiting " + FishMasterConfigNew.getRecastDelay() + " ticks before next cast");
-                        }
-                    } else if (timeFishing < MIN_FISHING_TICKS * 50) {
-                        // Still waiting for minimum fishing time
-                        long remainingTime = MIN_FISHING_TICKS * 50 - timeFishing;
-                        if (remainingTime % 1000 == 0) { // Debug message every second
-                            sendDebugMessage("Waiting for fish... " + (remainingTime / 1000) + "s remaining");
+                    // Only check for fish bites if we're not already waiting to reel in
+                    if (reelingDelayTimer == 0) {
+                        // Only check for fish bites after minimum fishing time has passed
+                        long timeFishing = System.currentTimeMillis() - fishingStartTime;
+                        if (timeFishing >= MIN_FISHING_TICKS * 50 && detectArmorStandFishBite(client)) {
+                            long currentTimeMillis = System.currentTimeMillis();
+                            if (currentTimeMillis - lastDetectionTime >= DETECTION_COOLDOWN) {
+                                lastDetectionTime = currentTimeMillis;
+                                sendDebugMessage("Fish detected after " + timeFishing + "ms of fishing! Starting reeling delay...");
+                                // Instead of immediately reeling in, start the reeling delay timer
+                                reelingDelayTimer = (int) FishMasterConfigNew.getReelingDelay();
+                                sendDebugMessage("Reeling delay started - waiting " + FishMasterConfigNew.getReelingDelay() + " ticks (" + (FishMasterConfigNew.getReelingDelay() * 50) + "ms) before reeling in");
+                            }
+                        } else if (timeFishing < MIN_FISHING_TICKS * 50) {
+                            // Still waiting for minimum fishing time
+                            long remainingTime = MIN_FISHING_TICKS * 50 - timeFishing;
+                            if (remainingTime % 1000 == 0) { // Debug message every second
+                                sendDebugMessage("Waiting for fish... " + (remainingTime / 1000) + "s remaining");
+                            }
                         }
                     }
                 }
@@ -499,6 +516,7 @@ public class AutoFishingFeature {
         currentState = FishingState.IDLE;
         isFishing = false;
         castCooldownTimer = 0;
+        reelingDelayTimer = 0; // Reset reeling delay timer
         // Reset recast mechanism variables
         int previousCastAttempts = castAttempts;
         castAttempts = 0;
@@ -511,6 +529,7 @@ public class AutoFishingFeature {
         sendDebugMessage("Stopping auto fishing - Resetting all timers and states");
         resetFishingState();
         delayTimer = 0;
+        reelingDelayTimer = 0; // Reset reeling delay timer
         lastDetectionTime = 0;
         // Disable anti-AFK when stopping
         sendDebugMessage("Auto fishing stopped - Anti-AFK disabled");
