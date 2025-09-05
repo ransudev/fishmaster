@@ -48,6 +48,7 @@ public class FishMasterConfigNew {
     private static volatile String seaCreatureKillerMode = "RCM"; // Default to RCM
     private static volatile int autoFishingKeybind = GLFW.GLFW_KEY_B; // Default keybind set to 'B'
     private static volatile float recastDelay = 5.0f; // Default 5 ticks (250ms) - matches GUI cycle button
+    private static volatile float reelingDelay = 3.0f; // Default 3 ticks (150ms) - delay after fish bite before reeling
     public static volatile int devMKillDist = 100;
     public static volatile int devMKillRot = 100;
 
@@ -99,6 +100,7 @@ public class FishMasterConfigNew {
                     seaCreatureKillerMode = config.seaCreatureKillerMode != null ? config.seaCreatureKillerMode : "RCM";
                     autoFishingKeybind = config.autoFishingKeybind != 0 ? config.autoFishingKeybind : GLFW.GLFW_KEY_B;
                     recastDelay = Math.max(2.0f, Math.min(30.0f, config.recastDelay));
+                    reelingDelay = Math.max(3.0f, Math.min(10.0f, config.reelingDelay)); // 150ms to 500ms
                     devMKillDist = config.devMKillDist;
                     devMKillRot = config.devMKillRot;
                     
@@ -172,6 +174,7 @@ public class FishMasterConfigNew {
             configData.seaCreatureKillerMode = seaCreatureKillerMode;
             configData.autoFishingKeybind = autoFishingKeybind;
             configData.recastDelay = recastDelay;
+            configData.reelingDelay = reelingDelay;
             configData.devMKillDist = devMKillDist;
             configData.devMKillRot = devMKillRot;
 
@@ -224,6 +227,7 @@ public class FishMasterConfigNew {
         public String seaCreatureKillerMode = "RCM";
         public int autoFishingKeybind = GLFW.GLFW_KEY_B;
         public float recastDelay = 5.0f; // 250ms in ticks
+        public float reelingDelay = 3.0f; // 150ms in ticks
         public int devMKillDist = 100;
         public int devMKillRot = 100;
     }
@@ -246,6 +250,7 @@ public class FishMasterConfigNew {
     public static String getSeaCreatureKillerMode() { return seaCreatureKillerMode; }
     public static int getAutoFishingKeybind() { return autoFishingKeybind; }
     public static float getRecastDelay() { return recastDelay; }
+    public static float getReelingDelay() { return reelingDelay; }
     public static boolean isConfigLoaded() { return configLoaded; }
 
     // ======================== ENHANCED SETTERS WITH VALIDATION ========================
@@ -354,5 +359,15 @@ public class FishMasterConfigNew {
         recastDelay = Math.max(2.0f, Math.min(30.0f, delay)); // 2-30 ticks (100ms-1500ms)
         save();
         System.out.println("[FishMaster] Recast delay set to: " + (recastDelay * 50) + "ms (" + recastDelay + " ticks)");
+    }
+
+    /**
+     * Sets the reeling delay for auto fishing (delay after fish bite detection before reeling in)
+     * @param delay Delay in ticks (3-10 ticks = 150ms-500ms)
+     */
+    public static void setReelingDelay(float delay) {
+        reelingDelay = Math.max(3.0f, Math.min(10.0f, delay)); // 3-10 ticks (150ms-500ms)
+        save();
+        System.out.println("[FishMaster] Reeling delay set to: " + (reelingDelay * 50) + "ms (" + reelingDelay + " ticks)");
     }
 }

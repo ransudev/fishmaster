@@ -97,6 +97,23 @@ private object ConfigBridge {
         }
     }
 
+    fun getReelingDelay(): Float = try {
+        val c = clazz() ?: return 3f // Default 3 ticks (150ms)
+        val m = c.getMethod("getReelingDelay")
+        (m.invoke(null) as? Float) ?: 3f
+    } catch (_: Throwable) { 3f }
+
+    fun setReelingDelay(delay: Float) {
+        try {
+            val c = clazz() ?: return
+            val m = c.getMethod("setReelingDelay", Float::class.javaPrimitiveType)
+            m.invoke(null, delay)
+            println("[GUI] Reeling delay updated to: ${delay * 50}ms")
+        } catch (e: Throwable) { 
+            println("[GUI] Failed to set reeling delay: ${e.message}")
+        }
+    }
+
     fun isConfigLoaded(): Boolean = try {
         val c = clazz() ?: return false
         val m = c.getMethod("isConfigLoaded")
@@ -300,7 +317,7 @@ class AnimatedCycleButton(
     private val options: List<String>,
     initialSelection: String,
     private val onChange: (String) -> Unit
-) : UIComponent() {
+) : UIContainer() {
     private var index = options.indexOf(initialSelection).let { if (it == -1) 0 else it }
     private val background: UIComponent
     private val text: UIText
@@ -1267,6 +1284,25 @@ class FishmasterScreen : WindowScreen(ElementaVersion.V5) {
             "Delay between fishing rod casts (lower = faster)",
             0.pixels(),
             recastDelayButton
+        )
+
+        // Reeling delay setting with cycle button  
+        val reelingDelayOptions = (150..500 step 50).map { "${it}ms" } // Creates: ["150ms", "200ms", "250ms", ..., "500ms"]
+        val currentReelingDelayMs = (ConfigBridge.getReelingDelay() * 50f).toInt()
+        val currentReelingDelayText = "${currentReelingDelayMs}ms"
+        val initialReelingDelay = if (reelingDelayOptions.contains(currentReelingDelayText)) currentReelingDelayText else "150ms"
+        
+        val reelingDelayButton = AnimatedCycleButton(reelingDelayOptions, initialReelingDelay) { selected ->
+            val delayMs = selected.removeSuffix("ms").toFloat()
+            ConfigBridge.setReelingDelay(delayMs / 50f) // Convert milliseconds back to ticks
+        }
+
+        createFeatureCard(
+            settingsContainer,
+            "Reeling Delay",
+            "Delay after fish bite before reeling in (prevents premature reeling)",
+            120.pixels(),
+            reelingDelayButton
         )
     }
 
