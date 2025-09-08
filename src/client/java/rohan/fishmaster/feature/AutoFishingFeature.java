@@ -10,7 +10,9 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.text.Text;
 import net.minecraft.util.Hand;
 import net.minecraft.util.Formatting;
-import rohan.fishmaster.config.FishMasterConfigNew;
+import net.minecraft.util.ActionResult;
+
+import rohan.fishmaster.config.FishMasterConfig;
 
 public class AutoFishingFeature {
     private static AutoFishingFeature instance;
@@ -42,7 +44,7 @@ public class AutoFishingFeature {
     private static long castStartTime = 0; // Track when casting started for bobber flight delay
     private static final int MAX_CAST_ATTEMPTS = 5;
     private static final long CAST_TIMEOUT = 5000; // 5 seconds to wait for bobber to settle (increased from 3s)
-    // RECAST_DELAY is now configurable via FishMasterConfigNew.getRecastDelay()
+    // RECAST_DELAY is now configurable via FishMasterConfig.getRecastDelay()
     private static final int BOBBER_FLIGHT_DELAY = 10; // 10 ticks (0.5 seconds) for bobber to fly
     private static final long BOBBER_SETTLE_TIMEOUT = 3000; // 3 seconds for bobber to settle in water
     private static final long MIN_RECAST_INTERVAL = 1000; // Minimum 1 second between recast attempts
@@ -151,11 +153,11 @@ public class AutoFishingFeature {
             return false;
         }
 
-        if (FishMasterConfigNew.isHealthChecksEnabled() &&
-            client.player.getHealth() <= FishMasterConfigNew.getMinHealthThreshold()) {
-            sendDebugMessage("Pre-start check failed: Health too low (" + client.player.getHealth() + " <= " + FishMasterConfigNew.getMinHealthThreshold() + ")");
+        if (FishMasterConfig.isHealthChecksEnabled() &&
+            client.player.getHealth() <= FishMasterConfig.getMinHealthThreshold()) {
+            sendDebugMessage("Pre-start check failed: Health too low (" + client.player.getHealth() + " <= " + FishMasterConfig.getMinHealthThreshold() + ")");
             sendFailsafeMessage("Cannot start: Player health too low (≤" +
-                (FishMasterConfigNew.getMinHealthThreshold() / 2) + " hearts)", true);
+                (FishMasterConfig.getMinHealthThreshold() / 2) + " hearts)", true);
             return false;
         }
 
@@ -325,8 +327,8 @@ public class AutoFishingFeature {
                 performSingleClick(client);
                 justCaughtFish = true;
                 resetFishingState();
-                delayTimer = (int) FishMasterConfigNew.getRecastDelay();
-                sendDebugMessage("Fish reeled in - waiting " + FishMasterConfigNew.getRecastDelay() + " ticks before next cast");
+                delayTimer = (int) FishMasterConfig.getRecastDelay();
+                sendDebugMessage("Fish reeled in - waiting " + FishMasterConfig.getRecastDelay() + " ticks before next cast");
             }
             return; // Don't continue with other logic while waiting to reel in
         }
@@ -367,7 +369,7 @@ public class AutoFishingFeature {
                 if (client.player.fishHook == null) {
                     sendDebugMessage("Bobber disappeared - resetting state");
                     resetFishingState();
-                    delayTimer = (int) FishMasterConfigNew.getRecastDelay();
+                    delayTimer = (int) FishMasterConfig.getRecastDelay();
                 } else if (hasBobberInWater(client.player)) {
                     // Only check for fish bites if we're not already waiting to reel in
                     if (reelingDelayTimer == 0) {
@@ -379,8 +381,8 @@ public class AutoFishingFeature {
                                 lastDetectionTime = currentTimeMillis;
                                 sendDebugMessage("Fish detected after " + timeFishing + "ms of fishing! Starting reeling delay...");
                                 // Instead of immediately reeling in, start the reeling delay timer
-                                reelingDelayTimer = (int) FishMasterConfigNew.getReelingDelay();
-                                sendDebugMessage("Reeling delay started - waiting " + FishMasterConfigNew.getReelingDelay() + " ticks (" + (FishMasterConfigNew.getReelingDelay() * 50) + "ms) before reeling in");
+                                reelingDelayTimer = (int) FishMasterConfig.getReelingDelay();
+                                sendDebugMessage("Reeling delay started - waiting " + FishMasterConfig.getReelingDelay() + " ticks (" + (FishMasterConfig.getReelingDelay() * 50) + "ms) before reeling in");
                             }
                         } else if (timeFishing < MIN_FISHING_TICKS * 50) {
                             // Still waiting for minimum fishing time
@@ -404,14 +406,14 @@ public class AutoFishingFeature {
         MinecraftClient client = MinecraftClient.getInstance();
 
         // Skip health checks if disabled in config
-        if (!FishMasterConfigNew.isHealthChecksEnabled()) {
+        if (!FishMasterConfig.isHealthChecksEnabled()) {
             sendDebugMessage("Health checks disabled in config - skipping");
             return true;
         }
 
         // Check player health
         float currentHealth = client.player.getHealth();
-        float threshold = FishMasterConfigNew.getMinHealthThreshold() - 2.0f;
+        float threshold = FishMasterConfig.getMinHealthThreshold() - 2.0f;
         if (currentHealth <= threshold) {
             sendDebugMessage("Health check failed - Current: " + currentHealth + ", Threshold: " + threshold);
             emergencyStopWithReason("Player health critically low (≤" + (threshold / 2) + " hearts)");
@@ -489,8 +491,8 @@ public class AutoFishingFeature {
     }
 
     private static void startCasting(MinecraftClient client) {
-        if (client.player == null || client.interactionManager == null) {
-            sendDebugMessage("startCasting: Player or interaction manager is null");
+        if (client.player == null) {
+            sendDebugMessage("startCasting: Player is null");
             return;
         }
 
@@ -498,7 +500,9 @@ public class AutoFishingFeature {
                    Hand.MAIN_HAND : Hand.OFF_HAND;
 
         sendDebugMessage("Starting cast - Hand: " + hand + ", Previous state: " + currentState);
-        client.interactionManager.interactItem(client.player, hand);
+        
+        // Simulate right-click instead of using interactItem
+        simulateRightClick(client, hand);
 
         currentState = FishingState.CASTING;
         castAttempts = 1; // This is the first attempt
@@ -671,7 +675,7 @@ public class AutoFishingFeature {
                 castStartTime = currentTime;
 
                 // If too many consecutive failures, trigger emergency stop
-                if (consecutiveFailures >= Math.max(3, FishMasterConfigNew.getMaxConsecutiveFailures() / 2)) {
+                if (consecutiveFailures >= Math.max(3, FishMasterConfig.getMaxConsecutiveFailures() / 2)) {
                     emergencyStopWithReason("Too many failed cast attempts - possible obstruction or invalid fishing area");
                     return;
                 }
@@ -701,8 +705,8 @@ public class AutoFishingFeature {
                     try {
                         Hand hand = client.player.getStackInHand(Hand.MAIN_HAND).getItem() instanceof FishingRodItem ?
                                    Hand.MAIN_HAND : Hand.OFF_HAND;
-                        client.interactionManager.interactItem(client.player, hand);
-                        delayTimer = (int) FishMasterConfigNew.getRecastDelay(); // Use configurable delay
+                        simulateRightClick(client, hand);
+                        delayTimer = (int) FishMasterConfig.getRecastDelay(); // Use configurable delay
                         lastCastTime = currentTime;
                         castAttempts++;
                         sendDebugMessage("Reeled in bobber due to settle timeout - Attempt: " + castAttempts);
@@ -729,7 +733,7 @@ public class AutoFishingFeature {
         try {
             Hand hand = client.player.getStackInHand(Hand.MAIN_HAND).getItem() instanceof FishingRodItem ?
                        Hand.MAIN_HAND : Hand.OFF_HAND;
-            client.interactionManager.interactItem(client.player, hand);
+            simulateRightClick(client, hand);
             castAttempts++;
             lastCastTime = currentTime;
             delayTimer = BOBBER_FLIGHT_DELAY; // Wait for bobber to fly out
@@ -749,7 +753,7 @@ public class AutoFishingFeature {
     }
 
     private static void performSingleClick(MinecraftClient client) {
-        if (client.player == null || client.interactionManager == null) {
+        if (client.player == null) {
             consecutiveFailures++;
             return;
         }
@@ -757,12 +761,51 @@ public class AutoFishingFeature {
         try {
             Hand hand = client.player.getStackInHand(Hand.MAIN_HAND).getItem() instanceof FishingRodItem ?
                        Hand.MAIN_HAND : Hand.OFF_HAND;
-            client.interactionManager.interactItem(client.player, hand);
+            simulateRightClick(client, hand);
             lastSuccessfulFish = System.currentTimeMillis();
             consecutiveFailures = 0; // Reset failure count on successful interaction
         } catch (Exception e) {
             consecutiveFailures++;
             sendFailsafeMessage("Failed to interact with fishing rod: " + e.getMessage(), false);
+        }
+    }
+
+    /**
+     * Simulates a right-click action using the item in the specified hand
+     * This mimics actual player input rather than sending direct packets
+     */
+    private static void simulateRightClick(MinecraftClient client, Hand hand) {
+        if (client.player == null || client.interactionManager == null) {
+            return;
+        }
+
+        try {
+            ItemStack itemStack = client.player.getStackInHand(hand);
+            if (itemStack.getItem() instanceof FishingRodItem) {
+                sendDebugMessage("Simulating right-click with " + hand + " hand using item directly");
+                
+                // Method 1: Use the item directly (most authentic approach)
+                ActionResult result = itemStack.use(client.world, client.player, hand);
+                sendDebugMessage("Direct item use result: " + result);
+                
+                // Method 2: If direct use doesn't work, try using interaction manager
+                // but only if the first method failed
+                if (result == ActionResult.FAIL || result == ActionResult.PASS) {
+                    sendDebugMessage("Direct use failed, trying interaction manager fallback");
+                    client.interactionManager.interactItem(client.player, hand);
+                }
+            } else {
+                sendDebugMessage("Warning: Attempted to simulate right-click with non-fishing rod item: " + itemStack.getItem());
+            }
+        } catch (Exception e) {
+            sendDebugMessage("Exception in simulateRightClick: " + e.getMessage());
+            // Fallback to interaction manager if all else fails
+            try {
+                client.interactionManager.interactItem(client.player, hand);
+                sendDebugMessage("Used interaction manager as final fallback");
+            } catch (Exception fallbackException) {
+                sendDebugMessage("All right-click simulation methods failed: " + fallbackException.getMessage());
+            }
         }
     }
 

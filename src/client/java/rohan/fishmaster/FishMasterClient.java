@@ -3,7 +3,7 @@ package rohan.fishmaster;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
-import rohan.fishmaster.config.FishMasterConfigNew;
+import rohan.fishmaster.config.FishMasterConfig;
 import rohan.fishmaster.handler.ClientTickHandler;
 import rohan.fishmaster.handler.DisconnectHandler;
 import rohan.fishmaster.handler.WebhookHandler;
@@ -24,7 +24,7 @@ public class FishMasterClient implements ClientModInitializer {
 
         try {
             // Load enhanced config first
-            FishMasterConfigNew.load();
+            FishMasterConfig.load();
 
             // Initialize keybindings FIRST - this is critical for preventing the crash
             KeyBindings.register();
@@ -48,7 +48,7 @@ public class FishMasterClient implements ClientModInitializer {
             // Add shutdown hooks for proper cleanup and config saving
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
                 System.out.println("[FishMaster] Shutting down, saving config...");
-                FishMasterConfigNew.saveAndShutdown();
+                FishMasterConfig.saveAndShutdown();
                 WebhookHandler.getInstance().shutdown();
             }));
 

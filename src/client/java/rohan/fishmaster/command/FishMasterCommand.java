@@ -10,7 +10,7 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.item.ItemStack;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
-import rohan.fishmaster.config.FishMasterConfigNew;
+import rohan.fishmaster.config.FishMasterConfig;
 import rohan.fishmaster.feature.AutoFishingFeature;
 import rohan.fishmaster.feature.SeaCreatureKiller;
 import rohan.fishmaster.handler.WebhookHandler;
@@ -113,8 +113,8 @@ public class FishMasterCommand {
 
         client.player.sendMessage(
             Text.literal("Webhook: ").formatted(Formatting.GRAY)
-                .append(Text.literal(FishMasterConfigNew.isWebhookEnabled() ? "ON" : "OFF")
-                    .formatted(FishMasterConfigNew.isWebhookEnabled() ? Formatting.GREEN : Formatting.RED)), false);
+                .append(Text.literal(FishMasterConfig.isWebhookEnabled() ? "ON" : "OFF")
+                    .formatted(FishMasterConfig.isWebhookEnabled() ? Formatting.GREEN : Formatting.RED)), false);
 
         return 1;
     }
@@ -137,8 +137,8 @@ public class FishMasterCommand {
             return 0;
         }
 
-        FishMasterConfigNew.setWebhookUrl(url);
-        FishMasterConfigNew.setWebhookEnabled(true);
+        FishMasterConfig.setWebhookUrl(url);
+        FishMasterConfig.setWebhookEnabled(true);
 
         client.player.sendMessage(
             Text.literal("[FishMaster] ").formatted(Formatting.AQUA)
@@ -157,20 +157,20 @@ public class FishMasterCommand {
             return 0;
         }
 
-        if (FishMasterConfigNew.getWebhookUrl().isEmpty()) {
+        if (FishMasterConfig.getWebhookUrl().isEmpty()) {
             client.player.sendMessage(
                 Text.literal("[FishMaster] ").formatted(Formatting.AQUA)
                     .append(Text.literal("No webhook URL set! Use '/fmwh set <url>' first.").formatted(Formatting.RED)), false);
             return 0;
         }
 
-        FishMasterConfigNew.setWebhookEnabled(true);
+        FishMasterConfig.setWebhookEnabled(true);
         WebhookHandler.getInstance().updateWebhookSettings();
 
         client.player.sendMessage(
             Text.literal("[FishMaster] ").formatted(Formatting.AQUA)
                 .append(Text.literal("Webhook enabled! Health checks will start in ")
-                    .append(Text.literal(String.valueOf(FishMasterConfigNew.getHealthCheckInterval() / 60000)))
+                    .append(Text.literal(String.valueOf(FishMasterConfig.getHealthCheckInterval() / 60000)))
                     .append(Text.literal(" minutes.")).formatted(Formatting.GREEN)), false);
 
         return 1;
@@ -183,7 +183,7 @@ public class FishMasterCommand {
             return 0;
         }
 
-        FishMasterConfigNew.setWebhookEnabled(false);
+        FishMasterConfig.setWebhookEnabled(false);
         WebhookHandler.getInstance().updateWebhookSettings();
 
         client.player.sendMessage(
@@ -200,7 +200,7 @@ public class FishMasterCommand {
             return 0;
         }
 
-        if (!FishMasterConfigNew.isWebhookEnabled() || FishMasterConfigNew.getWebhookUrl().isEmpty()) {
+        if (!FishMasterConfig.isWebhookEnabled() || FishMasterConfig.getWebhookUrl().isEmpty()) {
             client.player.sendMessage(
                 Text.literal("[FishMaster] ").formatted(Formatting.AQUA)
                     .append(Text.literal("Webhook not configured! Use '/fmwh set <url>' first.").formatted(Formatting.RED)), false);
@@ -226,7 +226,7 @@ public class FishMasterCommand {
         int minutes = IntegerArgumentType.getInteger(context, "minutes");
         long intervalMs = minutes * 60000L;
 
-        FishMasterConfigNew.setHealthCheckInterval(intervalMs);
+        FishMasterConfig.setHealthCheckInterval(intervalMs);
         WebhookHandler.getInstance().updateWebhookSettings();
 
         client.player.sendMessage(
@@ -243,8 +243,8 @@ public class FishMasterCommand {
             return 0;
         }
 
-        FishMasterConfigNew.setWebhookUrl("");
-        FishMasterConfigNew.setWebhookEnabled(false);
+        FishMasterConfig.setWebhookUrl("");
+        FishMasterConfig.setWebhookEnabled(false);
         WebhookHandler.getInstance().updateWebhookSettings();
 
         client.player.sendMessage(
@@ -267,17 +267,17 @@ public class FishMasterCommand {
 
         client.player.sendMessage(
             Text.literal("Enabled: ").formatted(Formatting.GRAY)
-                .append(Text.literal(FishMasterConfigNew.isWebhookEnabled() ? "YES" : "NO")
-                    .formatted(FishMasterConfigNew.isWebhookEnabled() ? Formatting.GREEN : Formatting.RED)), false);
+                .append(Text.literal(FishMasterConfig.isWebhookEnabled() ? "YES" : "NO")
+                    .formatted(FishMasterConfig.isWebhookEnabled() ? Formatting.GREEN : Formatting.RED)), false);
 
         client.player.sendMessage(
             Text.literal("URL: ").formatted(Formatting.GRAY)
-                .append(Text.literal(FishMasterConfigNew.getWebhookUrl().isEmpty() ? "Not set" : "Set")
-                    .formatted(FishMasterConfigNew.getWebhookUrl().isEmpty() ? Formatting.RED : Formatting.GREEN)), false);
+                .append(Text.literal(FishMasterConfig.getWebhookUrl().isEmpty() ? "Not set" : "Set")
+                    .formatted(FishMasterConfig.getWebhookUrl().isEmpty() ? Formatting.RED : Formatting.GREEN)), false);
 
         client.player.sendMessage(
             Text.literal("Health Check Interval: ").formatted(Formatting.GRAY)
-                .append(Text.literal(FishMasterConfigNew.getHealthCheckInterval() / 60000 + " minutes").formatted(Formatting.YELLOW)), false);
+                .append(Text.literal(FishMasterConfig.getHealthCheckInterval() / 60000 + " minutes").formatted(Formatting.YELLOW)), false);
 
         return 1;
     }
@@ -299,7 +299,7 @@ public class FishMasterCommand {
         }
 
         String weaponName = heldItem.getName().getString();
-        FishMasterConfigNew.setCustomMageWeapon(weaponName);
+        FishMasterConfig.setCustomMageWeapon(weaponName);
 
         client.player.sendMessage(
             Text.literal("[FishMaster] ").formatted(Formatting.AQUA)
@@ -317,7 +317,7 @@ public class FishMasterCommand {
         }
 
         // Clear the custom mage weapon
-        FishMasterConfigNew.setCustomMageWeapon("");
+        FishMasterConfig.setCustomMageWeapon("");
 
         client.player.sendMessage(
             Text.literal("[FishMaster] ").formatted(Formatting.AQUA)

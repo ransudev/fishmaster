@@ -85,7 +85,7 @@ public abstract class SeaCreatureKillerMode {
         if (stack == null || stack.isEmpty()) return false;
 
         String displayName = stack.getName().getString().toLowerCase();
-        String customWeapon = rohan.fishmaster.config.FishMasterConfigNew.getCustomMageWeapon().toLowerCase();
+        String customWeapon = rohan.fishmaster.config.FishMasterConfig.getCustomMageWeapon().toLowerCase();
 
         if (customWeapon.isEmpty()) return false;
         return displayName.contains(customWeapon);

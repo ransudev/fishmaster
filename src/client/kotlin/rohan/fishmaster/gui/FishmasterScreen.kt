@@ -23,7 +23,7 @@ import net.minecraft.util.Formatting
 
 // Bridge to access Java config statics without Kotlin compile-time dependency on the client Java task order
 private object ConfigBridge {
-    private const val CLASS_NAME = "rohan.fishmaster.config.FishMasterConfigNew"
+    private const val CLASS_NAME = "rohan.fishmaster.config.FishMasterConfig"
 
     private fun clazz(): Class<*>? = try {
         Class.forName(CLASS_NAME)
