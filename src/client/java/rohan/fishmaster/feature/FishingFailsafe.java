@@ -182,6 +182,9 @@ public class FishingFailsafe {
         try {
             // If there's a bobber, reel it in first
             if (client.player.fishHook != null && client.interactionManager != null) {
+                // Trigger hand swing animation for natural appearance
+                client.player.swingHand(net.minecraft.util.Hand.MAIN_HAND);
+                
                 client.interactionManager.interactItem(client.player, net.minecraft.util.Hand.MAIN_HAND);
 
                 // Wait a moment then cast again
@@ -189,6 +192,9 @@ public class FishingFailsafe {
                     try {
                         Thread.sleep(100);
                         if (client.interactionManager != null && client.player != null) {
+                            // Trigger hand swing animation for natural appearance
+                            client.player.swingHand(net.minecraft.util.Hand.MAIN_HAND);
+                            
                             client.interactionManager.interactItem(client.player, net.minecraft.util.Hand.MAIN_HAND);
                         }
                     } catch (InterruptedException e) {
@@ -210,6 +216,9 @@ public class FishingFailsafe {
         try {
             // Reel in any existing bobber
             if (client.player.fishHook != null && client.interactionManager != null) {
+                // Trigger hand swing animation for natural appearance
+                client.player.swingHand(net.minecraft.util.Hand.MAIN_HAND);
+                
                 client.interactionManager.interactItem(client.player, net.minecraft.util.Hand.MAIN_HAND);
             }
 

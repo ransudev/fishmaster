@@ -49,6 +49,7 @@ public class FishMasterConfigNew {
     private static volatile int autoFishingKeybind = GLFW.GLFW_KEY_B; // Default keybind set to 'B'
     private static volatile float recastDelay = 5.0f; // Default 5 ticks (250ms) - matches GUI cycle button
     private static volatile float reelingDelay = 3.0f; // Default 3 ticks (150ms) - delay after fish bite before reeling
+    private static volatile boolean mouseUngrabEnabled = true; // Default enabled - ungrab mouse cursor during auto fishing
     public static volatile int devMKillDist = 100;
     public static volatile int devMKillRot = 100;
 
@@ -101,6 +102,7 @@ public class FishMasterConfigNew {
                     autoFishingKeybind = config.autoFishingKeybind != 0 ? config.autoFishingKeybind : GLFW.GLFW_KEY_B;
                     recastDelay = Math.max(2.0f, Math.min(30.0f, config.recastDelay));
                     reelingDelay = Math.max(3.0f, Math.min(10.0f, config.reelingDelay)); // 150ms to 500ms
+                    mouseUngrabEnabled = config.mouseUngrabEnabled;
                     devMKillDist = config.devMKillDist;
                     devMKillRot = config.devMKillRot;
                     
@@ -175,6 +177,7 @@ public class FishMasterConfigNew {
             configData.autoFishingKeybind = autoFishingKeybind;
             configData.recastDelay = recastDelay;
             configData.reelingDelay = reelingDelay;
+            configData.mouseUngrabEnabled = mouseUngrabEnabled;
             configData.devMKillDist = devMKillDist;
             configData.devMKillRot = devMKillRot;
 
@@ -228,6 +231,7 @@ public class FishMasterConfigNew {
         public int autoFishingKeybind = GLFW.GLFW_KEY_B;
         public float recastDelay = 5.0f; // 250ms in ticks
         public float reelingDelay = 3.0f; // 150ms in ticks
+        public boolean mouseUngrabEnabled = true; // Default enabled
         public int devMKillDist = 100;
         public int devMKillRot = 100;
     }
@@ -251,6 +255,7 @@ public class FishMasterConfigNew {
     public static int getAutoFishingKeybind() { return autoFishingKeybind; }
     public static float getRecastDelay() { return recastDelay; }
     public static float getReelingDelay() { return reelingDelay; }
+    public static boolean isMouseUngrabEnabled() { return mouseUngrabEnabled; }
     public static boolean isConfigLoaded() { return configLoaded; }
 
     // ======================== ENHANCED SETTERS WITH VALIDATION ========================
@@ -369,5 +374,15 @@ public class FishMasterConfigNew {
         reelingDelay = Math.max(3.0f, Math.min(10.0f, delay)); // 3-10 ticks (150ms-500ms)
         save();
         System.out.println("[FishMaster] Reeling delay set to: " + (reelingDelay * 50) + "ms (" + reelingDelay + " ticks)");
+    }
+
+    /**
+     * Sets whether the mouse cursor should be ungrabbed during auto fishing
+     * @param enabled true to ungrab mouse, false to keep mouse locked
+     */
+    public static void setMouseUngrabEnabled(boolean enabled) {
+        mouseUngrabEnabled = enabled;
+        save();
+        System.out.println("[FishMaster] Mouse ungrab during auto fishing: " + (enabled ? "enabled" : "disabled"));
     }
 }

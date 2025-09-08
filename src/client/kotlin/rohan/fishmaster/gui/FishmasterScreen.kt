@@ -19,7 +19,7 @@ import net.minecraft.client.MinecraftClient
 import net.minecraft.text.Text
 import net.minecraft.util.Formatting
 
-// Note: Using real config from rohan.fishmaster.config.FishMasterConfig
+// Note: Using real config from rohan.fishmaster.config.FishMasterConfigNew
 
 // Bridge to access Java config statics without Kotlin compile-time dependency on the client Java task order
 private object ConfigBridge {
@@ -111,6 +111,23 @@ private object ConfigBridge {
             println("[GUI] Reeling delay updated to: ${delay * 50}ms")
         } catch (e: Throwable) { 
             println("[GUI] Failed to set reeling delay: ${e.message}")
+        }
+    }
+
+    fun isMouseUngrabEnabled(): Boolean = try {
+        val c = clazz() ?: return true
+        val m = c.getMethod("isMouseUngrabEnabled")
+        (m.invoke(null) as? Boolean) ?: true
+    } catch (_: Throwable) { true }
+
+    fun setMouseUngrabEnabled(enabled: Boolean) {
+        try {
+            val c = clazz() ?: return
+            val m = c.getMethod("setMouseUngrabEnabled", Boolean::class.javaPrimitiveType)
+            m.invoke(null, enabled)
+            println("[GUI] Mouse ungrab updated to: $enabled")
+        } catch (e: Throwable) { 
+            println("[GUI] Failed to set mouse ungrab: ${e.message}")
         }
     }
 
@@ -976,7 +993,7 @@ class FishmasterScreen : WindowScreen(ElementaVersion.V5) {
 
         // Add a small settings button next to the keybind button
         val settingsButton = UIContainer().constrain {
-            x = RelativeConstraint(1f) - 240.pixels() // Positioned just left of the keybind button
+            x = RelativeConstraint(1f) - 220.pixels() // Better positioned left of the keybind button
             y = CenterConstraint()
             width = 28.pixels()
             height = 28.pixels()
@@ -1132,13 +1149,14 @@ class FishmasterScreen : WindowScreen(ElementaVersion.V5) {
 
         val descText = UIText(description).constrain {
             x = 25.pixels() // Increased margin for accent strip
-            y = 35.pixels()
+            y = 38.pixels() // Slightly more spacing from title
+            width = 100.percent() - 220.pixels() // Prevent text overflow into controls
             textScale = 0.8f.pixels()
             color = Color(160, 165, 175).toConstraint() // Warmer gray
         } childOf card
 
         control.constrain {
-            x = RelativeConstraint(1f) - 200.pixels()
+            x = RelativeConstraint(1f) - 180.pixels() // Better right margin for controls
             y = CenterConstraint()
         } childOf card
 
@@ -1301,8 +1319,30 @@ class FishmasterScreen : WindowScreen(ElementaVersion.V5) {
             settingsContainer,
             "Reeling Delay",
             "Delay after fish bite before reeling in (prevents premature reeling)",
-            120.pixels(),
+            SiblingConstraint(15f),
             reelingDelayButton
+        )
+
+        // Mouse ungrab toggle
+        val mouseUngrabToggle = createToggleControl(ConfigBridge.isMouseUngrabEnabled()) { enabled ->
+            ConfigBridge.setMouseUngrabEnabled(enabled)
+            
+            // Send feedback message to player
+            MinecraftClient.getInstance().player?.sendMessage(
+                Text.literal("[FishMaster] Mouse ungrab during auto fishing: ")
+                    .formatted(Formatting.GREEN)
+                    .append(Text.literal(if (enabled) "ENABLED" else "DISABLED")
+                        .formatted(if (enabled) Formatting.GREEN else Formatting.RED)),
+                false
+            )
+        }
+
+        createFeatureCard(
+            settingsContainer,
+            "Mouse Ungrab",
+            "Unlock mouse cursor during auto fishing (disable for less suspicious behavior)",
+            SiblingConstraint(15f),
+            mouseUngrabToggle
         )
     }
 

@@ -9,7 +9,7 @@ import net.minecraft.screen.ScreenHandler
 import net.minecraft.screen.slot.SlotActionType
 import net.minecraft.text.Text
 import net.minecraft.util.Formatting
-import rohan.fishmaster.config.FishMasterConfig
+import rohan.fishmaster.config.FishMasterConfigNew
 
 /**
  * Auto Harp Feature for FishMaster
@@ -87,6 +87,7 @@ object AutoHarp {
     /**
      * Main tick method - should be called from main tick handler
      */
+    @JvmStatic
     fun tick() {
         if (!enabled) return
         

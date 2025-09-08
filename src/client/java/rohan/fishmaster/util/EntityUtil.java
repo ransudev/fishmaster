@@ -10,7 +10,7 @@ import java.util.List;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.stream.Collectors;
-import rohan.fishmaster.config.FishMasterConfig;
+import rohan.fishmaster.config.FishMasterConfigNew;
 import rohan.fishmaster.utils.AngleUtils;
 import net.minecraft.util.math.Box;
 

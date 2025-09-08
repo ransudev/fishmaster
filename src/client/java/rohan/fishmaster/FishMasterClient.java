@@ -58,7 +58,7 @@ public class FishMasterClient implements ClientModInitializer {
                 if (client.player != null && client.world != null) {
                     AutoFishingFeature.tick();
                     rohan.fishmaster.feature.SeaCreatureKiller.tick();
-                    rohan.fishmaster.qol.AutoHarp.INSTANCE.tick(); // Add Auto Harp feature
+                    rohan.fishmaster.qol.AutoHarp.tick(); // Add Auto Harp feature
                 }
             });
 

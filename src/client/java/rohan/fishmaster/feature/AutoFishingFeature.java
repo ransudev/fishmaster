@@ -93,7 +93,9 @@ public class AutoFishingFeature {
         if (!enabled) {
             sendDebugMessage("Stopping auto fishing - cleaning up resources");
             stop();
-            restoreMouseGrab();
+            if (FishMasterConfigNew.isMouseUngrabEnabled()) {
+                restoreMouseGrab();
+            }
             emergencyStop = false;
             SeaCreatureKiller.setAutoFishEnabled(false);
             sendDebugMessage("Auto fishing stopped - SCK disabled, tracker remains active");
@@ -108,7 +110,9 @@ public class AutoFishingFeature {
             }
             sendDebugMessage("Pre-start checks passed - initializing systems");
             switchToFishingRod();
-            ungrabMouse();
+            if (FishMasterConfigNew.isMouseUngrabEnabled()) {
+                ungrabMouse();
+            }
             sessionStartTime = System.currentTimeMillis();
             lastSuccessfulFish = sessionStartTime;
             consecutiveFailures = 0;
@@ -233,7 +237,7 @@ public class AutoFishingFeature {
     }
 
     public static void ensureMouseUngrabbedIfEnabled() {
-        if (enabled) {
+        if (enabled && FishMasterConfigNew.isMouseUngrabEnabled()) {
             MinecraftClient client = MinecraftClient.getInstance();
             if (client.mouse != null && client.mouse.isCursorLocked()) {
                 client.mouse.unlockCursor();
@@ -468,7 +472,9 @@ public class AutoFishingFeature {
         enabled = false;
         stop();
         sendFailsafeMessage("EMERGENCY STOP: " + reason, true);
-        restoreMouseGrab();
+        if (FishMasterConfigNew.isMouseUngrabEnabled()) {
+            restoreMouseGrab();
+        }
         // Disable sea creature killer when emergency stop occurs
         SeaCreatureKiller.setAutoFishEnabled(false);
         sendDebugMessage("Emergency stop complete - SCK disabled, mouse restored");
@@ -498,6 +504,10 @@ public class AutoFishingFeature {
                    Hand.MAIN_HAND : Hand.OFF_HAND;
 
         sendDebugMessage("Starting cast - Hand: " + hand + ", Previous state: " + currentState);
+        
+        // Trigger hand swing animation for natural appearance
+        client.player.swingHand(hand);
+        
         client.interactionManager.interactItem(client.player, hand);
 
         currentState = FishingState.CASTING;
@@ -539,7 +549,9 @@ public class AutoFishingFeature {
         serverConnectionLost = true;
         enabled = false;
         stop();
-        restoreMouseGrab();
+        if (FishMasterConfigNew.isMouseUngrabEnabled()) {
+            restoreMouseGrab();
+        }
         sendFailsafeMessage("Disconnected from server - auto fishing stopped", false);
         // Disable sea creature killer when disconnected
         SeaCreatureKiller.setAutoFishEnabled(false);
@@ -701,6 +713,10 @@ public class AutoFishingFeature {
                     try {
                         Hand hand = client.player.getStackInHand(Hand.MAIN_HAND).getItem() instanceof FishingRodItem ?
                                    Hand.MAIN_HAND : Hand.OFF_HAND;
+                        
+                        // Trigger hand swing animation for natural appearance
+                        client.player.swingHand(hand);
+                        
                         client.interactionManager.interactItem(client.player, hand);
                         delayTimer = (int) FishMasterConfigNew.getRecastDelay(); // Use configurable delay
                         lastCastTime = currentTime;
@@ -729,6 +745,10 @@ public class AutoFishingFeature {
         try {
             Hand hand = client.player.getStackInHand(Hand.MAIN_HAND).getItem() instanceof FishingRodItem ?
                        Hand.MAIN_HAND : Hand.OFF_HAND;
+            
+            // Trigger hand swing animation for natural appearance
+            client.player.swingHand(hand);
+            
             client.interactionManager.interactItem(client.player, hand);
             castAttempts++;
             lastCastTime = currentTime;
@@ -757,6 +777,10 @@ public class AutoFishingFeature {
         try {
             Hand hand = client.player.getStackInHand(Hand.MAIN_HAND).getItem() instanceof FishingRodItem ?
                        Hand.MAIN_HAND : Hand.OFF_HAND;
+            
+            // Trigger hand swing animation for natural appearance
+            client.player.swingHand(hand);
+            
             client.interactionManager.interactItem(client.player, hand);
             lastSuccessfulFish = System.currentTimeMillis();
             consecutiveFailures = 0; // Reset failure count on successful interaction
