@@ -1,6 +1,7 @@
 {
   "schemaVersion": 1,
   "id": "skyblocker",
+  "version": "1.0.0",
   "name": "fishmaster",
   "description": "Advanced Hypixel Skyblock utilities and enhancements",
   "authors": [
