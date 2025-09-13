@@ -6,6 +6,10 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 
+import org.lwjgl.glfw.GLFW;
+import rohan.fishmaster.mixin.client.MouseMixin;
+import java.util.Random;
+
 /**
  * Base class for Sea Creature Killer modes
  * Now only handles attack logic - combat entry/exit is managed by SeaCreatureKiller
@@ -110,5 +114,37 @@ public abstract class SeaCreatureKillerMode {
                displayName.contains("salty rod") ||
                displayName.contains("rod of legends") ||
                displayName.contains("rod of champions");
+    }
+
+    /**
+     * Simulate a right click using MouseMixin for authentic mouse simulation
+     */
+    protected void simulateRightClick(MinecraftClient client) {
+        if (client == null || client.getWindow() == null) {
+            return;
+        }
+
+        try {
+            long windowHandle = client.getWindow().getHandle();
+            
+            // Cast the Mouse instance to MouseMixin interface (applied via Mixin transformation)
+            MouseMixin mouseMixin = (MouseMixin) client.mouse;
+            
+            // Simulate right mouse button press
+            mouseMixin.invokeOnMouseButton(windowHandle, GLFW.GLFW_MOUSE_BUTTON_RIGHT, GLFW.GLFW_PRESS, 0);
+            
+            // Small delay to simulate human-like click duration
+            try {
+                Thread.sleep(10 + new Random().nextInt(20)); // 10-30ms delay
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            
+            // Simulate right mouse button release
+            mouseMixin.invokeOnMouseButton(windowHandle, GLFW.GLFW_MOUSE_BUTTON_RIGHT, GLFW.GLFW_RELEASE, 0);
+            
+        } catch (Exception e) {
+            // Silent failure - not critical for functionality
+        }
     }
 }

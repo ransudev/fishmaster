@@ -114,6 +114,23 @@ private object ConfigBridge {
         }
     }
 
+    fun isUngrabMouseWhenFishingEnabled(): Boolean = try {
+        val c = clazz() ?: return true // Default to enabled
+        val m = c.getMethod("isUngrabMouseWhenFishingEnabled")
+        (m.invoke(null) as? Boolean) ?: true
+    } catch (_: Throwable) { true }
+
+    fun setUngrabMouseWhenFishingEnabled(enabled: Boolean) {
+        try {
+            val c = clazz() ?: return
+            val m = c.getMethod("setUngrabMouseWhenFishingEnabled", Boolean::class.javaPrimitiveType)
+            m.invoke(null, enabled)
+            println("[GUI] Mouse ungrab when fishing updated to: $enabled")
+        } catch (e: Throwable) { 
+            println("[GUI] Failed to set mouse ungrab setting: ${e.message}")
+        }
+    }
+
     fun isConfigLoaded(): Boolean = try {
         val c = clazz() ?: return false
         val m = c.getMethod("isConfigLoaded")
@@ -976,7 +993,7 @@ class FishmasterScreen : WindowScreen(ElementaVersion.V5) {
 
         // Add a small settings button next to the keybind button
         val settingsButton = UIContainer().constrain {
-            x = RelativeConstraint(1f) - 240.pixels() // Positioned just left of the keybind button
+            x = RelativeConstraint(1f) - 40.pixels() // Positioned on the right side of the keybind button
             y = CenterConstraint()
             width = 28.pixels()
             height = 28.pixels()
@@ -1259,51 +1276,145 @@ class FishmasterScreen : WindowScreen(ElementaVersion.V5) {
             color = Color.WHITE.toConstraint()
         } childOf contentWrapper
 
-        // Settings container
-        val settingsContainer = UIContainer().constrain {
+        // Single comprehensive settings card
+        val settingsCard = UIContainer().constrain {
             x = 30.pixels()
             y = 70.pixels()
             width = 100.percent() - 60.pixels()
-            height = 100.percent() - 100.pixels()
+            height = 220.pixels()
         } childOf contentWrapper
 
-        // Recast delay setting with cycle button
-        val delayOptions = (100..1500 step 50).map { "${it}ms" } // Creates: ["100ms", "150ms", "200ms", ..., "1500ms"]
+        val cardBackground = UIRoundedRectangle(8f).constrain {
+            width = 100.percent()
+            height = 100.percent()
+            color = Color(25, 28, 35, 150).toConstraint()
+        } childOf settingsCard
+
+        // Add gradient accent strip
+        val accentStrip = UIRoundedRectangle(8f).constrain {
+            x = 0.pixels()
+            y = 0.pixels()
+            width = 4.pixels()
+            height = 100.percent()
+            color = Color(88, 191, 242).toConstraint()
+        } childOf settingsCard
+
+        // Card title
+        val cardTitle = UIText("Fishing Configuration").constrain {
+            x = 25.pixels()
+            y = 15.pixels()
+            textScale = 1.2f.pixels()
+            color = Color.WHITE.toConstraint()
+        } childOf settingsCard
+
+        // Settings content area
+        val settingsContent = UIContainer().constrain {
+            x = 25.pixels()
+            y = 45.pixels()
+            width = 100.percent() - 50.pixels()
+            height = 100.percent() - 60.pixels()
+        } childOf settingsCard
+
+        // Row 1: Recast Delay
+        val recastRow = UIContainer().constrain {
+            x = 0.pixels()
+            y = 0.pixels()
+            width = 100.percent()
+            height = 50.pixels()
+        } childOf settingsContent
+
+        val recastLabel = UIText("Recast Delay").constrain {
+            x = 0.pixels()
+            y = 5.pixels()
+            textScale = 1.0f.pixels()
+            color = Color.WHITE.toConstraint()
+        } childOf recastRow
+
+        val recastDescription = UIText("Delay between fishing rod casts").constrain {
+            x = 0.pixels()
+            y = 22.pixels()
+            textScale = 0.8f.pixels()
+            color = Color(140, 140, 145).toConstraint()
+        } childOf recastRow
+
+        val delayOptions = (500..1500 step 50).map { "${it}ms" }
         val currentDelayMs = (ConfigBridge.getRecastDelay() * 50f).toInt()
         val currentDelayText = "${currentDelayMs}ms"
-        val initialDelay = if (delayOptions.contains(currentDelayText)) currentDelayText else "250ms"
+        val initialDelay = if (delayOptions.contains(currentDelayText)) currentDelayText else "500ms"
         
         val recastDelayButton = AnimatedCycleButton(delayOptions, initialDelay) { selected ->
             val delayMs = selected.removeSuffix("ms").toFloat()
-            ConfigBridge.setRecastDelay(delayMs / 50f) // Convert milliseconds back to ticks
-        }
+            ConfigBridge.setRecastDelay(delayMs / 50f)
+        }.constrain {
+            x = RelativeConstraint(1f) - 140.pixels()
+            y = CenterConstraint()
+        } childOf recastRow
 
-        createFeatureCard(
-            settingsContainer,
-            "Recast Delay",
-            "Delay between fishing rod casts (lower = faster)",
-            0.pixels(),
-            recastDelayButton
-        )
+        // Row 2: Reeling Delay
+        val reelingRow = UIContainer().constrain {
+            x = 0.pixels()
+            y = 55.pixels()
+            width = 100.percent()
+            height = 50.pixels()
+        } childOf settingsContent
 
-        // Reeling delay setting with cycle button  
-        val reelingDelayOptions = (150..500 step 50).map { "${it}ms" } // Creates: ["150ms", "200ms", "250ms", ..., "500ms"]
+        val reelingLabel = UIText("Reeling Delay").constrain {
+            x = 0.pixels()
+            y = 5.pixels()
+            textScale = 1.0f.pixels()
+            color = Color.WHITE.toConstraint()
+        } childOf reelingRow
+
+        val reelingDescription = UIText("Delay after fish bite before reeling in").constrain {
+            x = 0.pixels()
+            y = 22.pixels()
+            textScale = 0.8f.pixels()
+            color = Color(140, 140, 145).toConstraint()
+        } childOf reelingRow
+
+        val reelingDelayOptions = (150..500 step 50).map { "${it}ms" }
         val currentReelingDelayMs = (ConfigBridge.getReelingDelay() * 50f).toInt()
         val currentReelingDelayText = "${currentReelingDelayMs}ms"
         val initialReelingDelay = if (reelingDelayOptions.contains(currentReelingDelayText)) currentReelingDelayText else "150ms"
         
         val reelingDelayButton = AnimatedCycleButton(reelingDelayOptions, initialReelingDelay) { selected ->
             val delayMs = selected.removeSuffix("ms").toFloat()
-            ConfigBridge.setReelingDelay(delayMs / 50f) // Convert milliseconds back to ticks
-        }
+            ConfigBridge.setReelingDelay(delayMs / 50f)
+        }.constrain {
+            x = RelativeConstraint(1f) - 140.pixels()
+            y = CenterConstraint()
+        } childOf reelingRow
 
-        createFeatureCard(
-            settingsContainer,
-            "Reeling Delay",
-            "Delay after fish bite before reeling in (prevents premature reeling)",
-            120.pixels(),
-            reelingDelayButton
-        )
+        // Row 3: Mouse Ungrab Toggle
+        val mouseRow = UIContainer().constrain {
+            x = 0.pixels()
+            y = 110.pixels()
+            width = 100.percent()
+            height = 50.pixels()
+        } childOf settingsContent
+
+        val mouseLabel = UIText("Ungrab Mouse").constrain {
+            x = 0.pixels()
+            y = 5.pixels()
+            textScale = 1.0f.pixels()
+            color = Color.WHITE.toConstraint()
+        } childOf mouseRow
+
+        val mouseDescription = UIText("Release cursor for background usage").constrain {
+            x = 0.pixels()
+            y = 22.pixels()
+            textScale = 0.8f.pixels()
+            color = Color(140, 140, 145).toConstraint()
+        } childOf mouseRow
+
+        val mouseUngrabToggle = createToggleControl(
+            ConfigBridge.isUngrabMouseWhenFishingEnabled()
+        ) { newState ->
+            ConfigBridge.setUngrabMouseWhenFishingEnabled(newState)
+        }.constrain {
+            x = RelativeConstraint(1f) - 74.pixels() // 64px width + 10px margin
+            y = CenterConstraint()
+        } childOf mouseRow
     }
 
     private fun createModeSelector(): UIComponent {

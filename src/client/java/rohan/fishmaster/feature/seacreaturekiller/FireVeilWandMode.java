@@ -3,8 +3,6 @@ package rohan.fishmaster.feature.seacreaturekiller;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.entity.Entity;
 import net.minecraft.item.ItemStack;
-import net.minecraft.util.ActionResult;
-import net.minecraft.util.Hand;
 
 /**
  * Fire Veil Wand mode
@@ -41,11 +39,9 @@ public class FireVeilWandMode extends SeaCreatureKillerMode {
             return;
         }
 
-        // Activate the wand ability directly (right-click item). No need to click ground.
-        ActionResult result = client.interactionManager.interactItem(client.player, Hand.MAIN_HAND);
-        if (result != ActionResult.FAIL) {
-            lastCastTime = now; // Start cooldown only if we attempted to use it
-        }
+        // Activate the wand ability using mouse simulation instead of interactionManager.interactItem
+        simulateRightClick(client);
+        lastCastTime = now; // Start cooldown
     }
 
     @Override

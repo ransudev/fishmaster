@@ -10,9 +10,11 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.text.Text;
 import net.minecraft.util.Hand;
 import net.minecraft.util.Formatting;
-import net.minecraft.util.ActionResult;
 
+import org.lwjgl.glfw.GLFW;
 import rohan.fishmaster.config.FishMasterConfig;
+import rohan.fishmaster.mixin.client.MouseMixin;
+import java.util.Random;
 
 public class AutoFishingFeature {
     private static AutoFishingFeature instance;
@@ -28,6 +30,9 @@ public class AutoFishingFeature {
     // Debug mode variables
     private static boolean debugMode = false;
 
+    // Random instance for delay variance
+    private static final Random random = new Random();
+
     // Failsafe variables
     private static long lastSuccessfulFish = System.currentTimeMillis();
     private static int consecutiveFailures = 0;
@@ -39,38 +44,15 @@ public class AutoFishingFeature {
 
     // Recast mechanism variables
     private static int castAttempts = 0;
-    private static long lastCastTime = 0;
+    private static long lastCastTime = 0; // Track when last cast was made
     private static boolean justCaughtFish = false; // Flag to prevent recast mechanism after successful catch
-    private static long castStartTime = 0; // Track when casting started for bobber flight delay
     private static final int MAX_CAST_ATTEMPTS = 5;
-    private static final long CAST_TIMEOUT = 5000; // 5 seconds to wait for bobber to settle (increased from 3s)
-    // RECAST_DELAY is now configurable via FishMasterConfig.getRecastDelay()
     private static final int BOBBER_FLIGHT_DELAY = 10; // 10 ticks (0.5 seconds) for bobber to fly
-    private static final long BOBBER_SETTLE_TIMEOUT = 3000; // 3 seconds for bobber to settle in water
-    private static final long MIN_RECAST_INTERVAL = 1000; // Minimum 1 second between recast attempts
+    private static final long RECAST_DELAY = 2000; // 2 seconds delay before recasting on failure
 
     // Fishing timing variables
     private static long fishingStartTime = 0;
     private static final int MIN_FISHING_TICKS = 20; // 20 ticks (1 second) after bobber touches water
-
-
-    // Player movement detection for failsafe
-    private static double lastPlayerX = 0;
-    private static double lastPlayerY = 0;
-    private static double lastPlayerZ = 0;
-    private static boolean playerPositionInitialized = false;
-    private static final double MOVEMENT_THRESHOLD = 10.0; // Player moved more than 10 blocks
-
-    // --- Anti-AFK variables ---
-    private static float originalYaw = 0f;
-    private static float originalPitch = 0f;
-    private static boolean originalAnglesSet = false;
-    private static int antiAfkMoveCount = 0;
-    private static long lastAntiAfkMove = 0;
-    private static final long ANTI_AFK_INTERVAL_MS = 5000; // 5 seconds between moves
-    private static float targetYaw = 0f;
-    private static float targetPitch = 0f;
-    private static boolean returningToOriginal = false;
 
     private enum FishingState {
         IDLE,
@@ -81,7 +63,6 @@ public class AutoFishingFeature {
     private static FishingState currentState = FishingState.IDLE;
 
     private static final long DETECTION_COOLDOWN = 50;
-    private static final int BOBBER_SETTLE_TIME = 3;
 
     static {
         // Initialize fishing events - but don't register keybindings here
@@ -95,12 +76,13 @@ public class AutoFishingFeature {
         if (!enabled) {
             sendDebugMessage("Stopping auto fishing - cleaning up resources");
             stop();
-            restoreMouseGrab();
+            // Restore mouse grab if ungrabbing was enabled
+            if (FishMasterConfig.isUngrabMouseWhenFishingEnabled()) {
+                restoreMouseGrab();
+            }
             emergencyStop = false;
             SeaCreatureKiller.setAutoFishEnabled(false);
             sendDebugMessage("Auto fishing stopped - SCK disabled, tracker remains active");
-            // Reset anti-AFK original angles when disabling
-            originalAnglesSet = false;
         } else {
             sendDebugMessage("Starting auto fishing - performing pre-start checks");
             if (!performPreStartChecks()) {
@@ -110,7 +92,10 @@ public class AutoFishingFeature {
             }
             sendDebugMessage("Pre-start checks passed - initializing systems");
             switchToFishingRod();
-            ungrabMouse();
+            // Ungrab mouse if enabled in config (allows background usage)
+            if (FishMasterConfig.isUngrabMouseWhenFishingEnabled()) {
+                ungrabMouse();
+            }
             sessionStartTime = System.currentTimeMillis();
             lastSuccessfulFish = sessionStartTime;
             consecutiveFailures = 0;
@@ -118,15 +103,6 @@ public class AutoFishingFeature {
             serverConnectionLost = false;
             SeaCreatureKiller.setAutoFishEnabled(true);
             sendDebugMessage("Auto fishing started - Session time: " + sessionStartTime + ", SCK enabled, tracker active");
-            // Set anti-AFK original angles exactly when enabling
-            MinecraftClient client = MinecraftClient.getInstance();
-            if (client.player != null) {
-                originalYaw = client.player.getYaw();
-                originalPitch = client.player.getPitch();
-                originalAnglesSet = true;
-                targetYaw = originalYaw;
-                targetPitch = originalPitch;
-            }
         }
 
         MinecraftClient client = MinecraftClient.getInstance();
@@ -173,13 +149,7 @@ public class AutoFishingFeature {
             return false;
         }
 
-        // Initialize player position tracking
-        lastPlayerX = client.player.getX();
-        lastPlayerY = client.player.getY();
-        lastPlayerZ = client.player.getZ();
-        playerPositionInitialized = true;
-        sendDebugMessage("Pre-start checks passed - Player position initialized: (" + lastPlayerX + ", " + lastPlayerY + ", " + lastPlayerZ + ")");
-
+        sendDebugMessage("Pre-start checks passed");
         return true;
     }
 
@@ -235,10 +205,25 @@ public class AutoFishingFeature {
     }
 
     public static void ensureMouseUngrabbedIfEnabled() {
-        if (enabled) {
+        if (enabled && FishMasterConfig.isUngrabMouseWhenFishingEnabled()) {
             MinecraftClient client = MinecraftClient.getInstance();
             if (client.mouse != null && client.mouse.isCursorLocked()) {
                 client.mouse.unlockCursor();
+                sendDebugMessage("Mouse re-ungrabbed - preventing automatic grab while fishing");
+            }
+        }
+    }
+
+    /**
+     * Force mouse ungrab if auto-fishing is enabled and mouse ungrab setting is on
+     * This can be called externally (e.g., from event handlers) to maintain ungrabbed state
+     */
+    public static void forceMouseUngrabIfEnabled() {
+        if (enabled && FishMasterConfig.isUngrabMouseWhenFishingEnabled()) {
+            MinecraftClient client = MinecraftClient.getInstance();
+            if (client.mouse != null) {
+                client.mouse.unlockCursor();
+                sendDebugMessage("Mouse forcibly ungrabbed during auto-fishing session");
             }
         }
     }
@@ -259,6 +244,13 @@ public class AutoFishingFeature {
             sendDebugMessage("Tick: Player or world became null - triggering emergency stop");
             emergencyStopWithReason("Player or world became null");
             return;
+        }
+
+        // Ensure mouse stays ungrabbed if the setting is enabled (check every 10 ticks to reduce overhead)
+        if (FishMasterConfig.isUngrabMouseWhenFishingEnabled()) {
+            if (System.currentTimeMillis() % 500 < 50) { // Check approximately every 500ms
+                ensureMouseUngrabbedIfEnabled();
+            }
         }
 
 
@@ -326,9 +318,13 @@ public class AutoFishingFeature {
                 sendDebugMessage("Reeling delay completed - reeling in fish!");
                 performSingleClick(client);
                 justCaughtFish = true;
+                
+                // Reset fishing state first
                 resetFishingState();
-                delayTimer = (int) FishMasterConfig.getRecastDelay();
-                sendDebugMessage("Fish reeled in - waiting " + FishMasterConfig.getRecastDelay() + " ticks before next cast");
+                
+                // Set a longer delay after successful catch to prevent immediate recasting
+                delayTimer = getRandomizedRecastDelay();
+                sendDebugMessage("Fish reeled in successfully - waiting " + delayTimer + " ticks before next cast, justCaughtFish: " + justCaughtFish);
             }
             return; // Don't continue with other logic while waiting to reel in
         }
@@ -336,11 +332,15 @@ public class AutoFishingFeature {
         switch (currentState) {
             case IDLE:
                 if (client.player.fishHook == null) {
+                    sendDebugMessage("IDLE state: No bobber detected, starting new cast (justCaughtFish: " + justCaughtFish + ")");
                     startCasting(client);
                 } else {
                     if (hasBobberInWater(client.player)) {
+                        sendDebugMessage("IDLE state: Found existing bobber in water, transitioning to FISHING");
                         currentState = FishingState.FISHING;
                         isFishing = true;
+                    } else {
+                        sendDebugMessage("IDLE state: Found bobber but not in water yet, waiting...");
                     }
                 }
                 break;
@@ -352,24 +352,62 @@ public class AutoFishingFeature {
                     isFishing = true;
                     fishingStartTime = System.currentTimeMillis(); // Record when fishing started
                     castAttempts = 0; // Reset cast attempts on successful cast
-                    sendDebugMessage("Bobber in water - State: CASTING → FISHING, starting 20-tick delay");
+                    sendDebugMessage("Bobber in water - State: CASTING → FISHING");
+                } else if (client.player.fishHook != null) {
+                    // We have a bobber but it's not in water yet, just wait
+                    sendDebugMessage("Bobber exists but not in water yet - waiting for settle...");
                 } else {
-                    // Only try to recast if we haven't successfully cast yet
-                    // If we already have a bobber out, just wait (don't trigger recast mechanism)
-                    if (client.player.fishHook == null) {
-                        handleRecastMechanism(client);
+                    // No bobber exists - check if this is first cast or if enough time passed for recast
+                    long currentTimeMs = System.currentTimeMillis();
+                    boolean isFirstCast = (castAttempts == 0);
+                    boolean enoughTimeForRecast = (currentTimeMs - lastCastTime) >= RECAST_DELAY;
+                    
+                    if (isFirstCast || enoughTimeForRecast) {
+                        if (castAttempts < MAX_CAST_ATTEMPTS) {
+                            simulateRightClick(client);
+                            castAttempts++;
+                            lastCastTime = currentTimeMs;
+                            delayTimer = BOBBER_FLIGHT_DELAY; // Wait for bobber to fly out
+
+                            if (castAttempts > 1) {
+                                sendDebugMessage("Recasting bobber (attempt " + castAttempts + "/" + MAX_CAST_ATTEMPTS + ") after 2s delay - waiting " + BOBBER_FLIGHT_DELAY + " ticks for flight");
+                                sendFailsafeMessage("Recasting bobber (attempt " + castAttempts + "/" + MAX_CAST_ATTEMPTS + ")", false);
+                            } else {
+                                sendDebugMessage("Initial cast - waiting " + BOBBER_FLIGHT_DELAY + " ticks for bobber flight");
+                            }
+                        } else {
+                            // Too many attempts, reset and try again with longer delay
+                            sendFailsafeMessage("Failed to cast bobber after " + MAX_CAST_ATTEMPTS + " attempts. Retrying...", false);
+                            castAttempts = 0;
+                            consecutiveFailures++;
+                            lastCastTime = currentTimeMs;
+                            delayTimer = getRandomizedRecastDelay() * 2; // Moderate delay
+                            
+                            // Check for emergency stop
+                            if (consecutiveFailures >= Math.max(3, FishMasterConfig.getMaxConsecutiveFailures() / 2)) {
+                                emergencyStopWithReason("Too many failed cast attempts - possible obstruction or invalid fishing area");
+                                return;
+                            }
+                        }
                     } else {
-                        // We have a bobber but it's not in water yet, just wait
-                        sendDebugMessage("Bobber exists but not in water yet - waiting...");
+                        // Still waiting for the 2-second recast delay
+                        long remainingTime = RECAST_DELAY - (currentTimeMs - lastCastTime);
+                        if (remainingTime % 1000 < 50) { // Debug message roughly every second
+                            sendDebugMessage("Waiting " + (remainingTime / 1000 + 1) + "s before recasting (attempt " + (castAttempts + 1) + "/" + MAX_CAST_ATTEMPTS + ")");
+                        }
                     }
                 }
                 break;
 
             case FISHING:
                 if (client.player.fishHook == null) {
-                    sendDebugMessage("Bobber disappeared - resetting state");
-                    resetFishingState();
-                    delayTimer = (int) FishMasterConfig.getRecastDelay();
+                    if (justCaughtFish) {
+                        sendDebugMessage("Bobber disappeared after successful catch - this is expected, delayTimer should handle next cast");
+                    } else {
+                        sendDebugMessage("Bobber disappeared unexpectedly - resetting state");
+                        resetFishingState();
+                        delayTimer = getRandomizedRecastDelay();
+                    }
                 } else if (hasBobberInWater(client.player)) {
                     // Only check for fish bites if we're not already waiting to reel in
                     if (reelingDelayTimer == 0) {
@@ -381,8 +419,8 @@ public class AutoFishingFeature {
                                 lastDetectionTime = currentTimeMillis;
                                 sendDebugMessage("Fish detected after " + timeFishing + "ms of fishing! Starting reeling delay...");
                                 // Instead of immediately reeling in, start the reeling delay timer
-                                reelingDelayTimer = (int) FishMasterConfig.getReelingDelay();
-                                sendDebugMessage("Reeling delay started - waiting " + FishMasterConfig.getReelingDelay() + " ticks (" + (FishMasterConfig.getReelingDelay() * 50) + "ms) before reeling in");
+                                reelingDelayTimer = getRandomizedReelingDelay();
+                                sendDebugMessage("Reeling delay started - waiting " + reelingDelayTimer + " ticks (" + (reelingDelayTimer * 50) + "ms) before reeling in");
                             }
                         } else if (timeFishing < MIN_FISHING_TICKS * 50) {
                             // Still waiting for minimum fishing time
@@ -496,23 +534,20 @@ public class AutoFishingFeature {
             return;
         }
 
-        Hand hand = client.player.getStackInHand(Hand.MAIN_HAND).getItem() instanceof FishingRodItem ?
-                   Hand.MAIN_HAND : Hand.OFF_HAND;
-
-        sendDebugMessage("Starting cast - Hand: " + hand + ", Previous state: " + currentState);
+        // Clear the justCaughtFish flag when starting a new cast
+        justCaughtFish = false;
         
-        // Simulate right-click instead of using interactItem
-        simulateRightClick(client, hand);
+        sendDebugMessage("Starting cast - Previous state: " + currentState + ", justCaughtFish reset: " + justCaughtFish);
+        simulateRightClick(client);
+        
 
         currentState = FishingState.CASTING;
         castAttempts = 1; // This is the first attempt
-        lastCastTime = System.currentTimeMillis();
+        lastCastTime = System.currentTimeMillis(); // Track when the cast was made
         isFishing = false;
-        justCaughtFish = false; // Clear the flag when starting a new cast
-        castStartTime = lastCastTime; // Track when casting started
         delayTimer = 10; // Add 10 tick delay after casting to let bobber fly
 
-        sendDebugMessage("Cast initiated - State: CASTING, Attempt: " + castAttempts + ", waiting 10 ticks for bobber to fly");
+        sendDebugMessage("Cast initiated via mouse simulation - State: CASTING, Attempt: " + castAttempts + ", waiting 10 ticks for bobber to fly");
     }
 
     private static void resetFishingState() {
@@ -521,12 +556,14 @@ public class AutoFishingFeature {
         isFishing = false;
         castCooldownTimer = 0;
         reelingDelayTimer = 0; // Reset reeling delay timer
+        
         // Reset recast mechanism variables
         int previousCastAttempts = castAttempts;
         castAttempts = 0;
-        lastCastTime = 0;
+        lastCastTime = 0; // Reset cast timing
 
-        sendDebugMessage("Fishing state reset - Previous: " + previousState + " → Current: IDLE, Previous cast attempts: " + previousCastAttempts);
+        // Don't reset justCaughtFish here - it should persist until the next cast starts
+        sendDebugMessage("Fishing state reset - Previous: " + previousState + " → Current: IDLE, Previous cast attempts: " + previousCastAttempts + ", justCaughtFish preserved: " + justCaughtFish);
     }
 
     private static void stop() {
@@ -535,6 +572,7 @@ public class AutoFishingFeature {
         delayTimer = 0;
         reelingDelayTimer = 0; // Reset reeling delay timer
         lastDetectionTime = 0;
+        justCaughtFish = false; // Reset catch flag when stopping
         // Disable anti-AFK when stopping
         sendDebugMessage("Auto fishing stopped - Anti-AFK disabled");
     }
@@ -652,106 +690,6 @@ public class AutoFishingFeature {
         return result;
     }
 
-    private static void handleRecastMechanism(MinecraftClient client) {
-        if (client.player == null || client.world == null || client.interactionManager == null) {
-            return;
-        }
-
-        long currentTime = System.currentTimeMillis();
-        
-        // Calculate time since cast started (including bobber flight time)
-        long timeSinceCastStart = currentTime - castStartTime;
-        long timeSinceLastCast = currentTime - lastCastTime;
-
-        // Check if we've exceeded maximum cast attempts
-        if (castAttempts >= MAX_CAST_ATTEMPTS) {
-            // Wait longer before trying again to account for bobber settle time
-            if (timeSinceLastCast >= CAST_TIMEOUT) {
-                sendDebugMessage("Resetting cast attempts after timeout - Time since last cast: " + timeSinceLastCast + "ms");
-                sendFailsafeMessage("Failed to cast bobber after " + MAX_CAST_ATTEMPTS + " attempts. Retrying...", false);
-                castAttempts = 0;
-                consecutiveFailures++;
-                lastCastTime = currentTime;
-                castStartTime = currentTime;
-
-                // If too many consecutive failures, trigger emergency stop
-                if (consecutiveFailures >= Math.max(3, FishMasterConfig.getMaxConsecutiveFailures() / 2)) {
-                    emergencyStopWithReason("Too many failed cast attempts - possible obstruction or invalid fishing area");
-                    return;
-                }
-            }
-            return;
-        }
-
-        // Don't attempt recast too quickly - respect minimum interval
-        if (timeSinceLastCast < MIN_RECAST_INTERVAL) {
-            sendDebugMessage("Recast interval not met - Time since last: " + timeSinceLastCast + "ms, Required: " + MIN_RECAST_INTERVAL + "ms");
-            return;
-        }
-
-        // Check if bobber exists but hasn't settled in water yet
-        if (client.player.fishHook != null) {
-            // If bobber exists but not in water, wait for settle timeout before attempting recast
-            if (!hasBobberInWater(client.player)) {
-                if (timeSinceCastStart < BOBBER_SETTLE_TIMEOUT) {
-                    // Still within settle timeout, just wait
-                    if (timeSinceCastStart % 1000 < 50) { // Debug message roughly every second
-                        sendDebugMessage("Waiting for bobber to settle - Time elapsed: " + timeSinceCastStart + "ms, Timeout: " + BOBBER_SETTLE_TIMEOUT + "ms");
-                    }
-                    return;
-                } else {
-                    // Bobber settle timeout exceeded, reel in and try again
-                    sendDebugMessage("Bobber settle timeout exceeded (" + timeSinceCastStart + "ms) - reeling in for recast");
-                    try {
-                        Hand hand = client.player.getStackInHand(Hand.MAIN_HAND).getItem() instanceof FishingRodItem ?
-                                   Hand.MAIN_HAND : Hand.OFF_HAND;
-                        simulateRightClick(client, hand);
-                        delayTimer = (int) FishMasterConfig.getRecastDelay(); // Use configurable delay
-                        lastCastTime = currentTime;
-                        castAttempts++;
-                        sendDebugMessage("Reeled in bobber due to settle timeout - Attempt: " + castAttempts);
-                    } catch (Exception e) {
-                        castAttempts++;
-                        sendFailsafeMessage("Failed to reel in bobber: " + e.getMessage(), false);
-                    }
-                }
-            }
-            // If bobber is in water, don't interfere - let normal fishing logic handle it
-            return;
-        }
-
-        // No bobber exists - need to cast
-        // Ensure we have a valid fishing rod before attempting to cast
-        if (!hasValidFishingRod()) {
-            if (!switchToFishingRod()) {
-                emergencyStopWithReason("No valid fishing rod available for recasting");
-                return;
-            }
-        }
-
-        // Attempt to cast
-        try {
-            Hand hand = client.player.getStackInHand(Hand.MAIN_HAND).getItem() instanceof FishingRodItem ?
-                       Hand.MAIN_HAND : Hand.OFF_HAND;
-            simulateRightClick(client, hand);
-            castAttempts++;
-            lastCastTime = currentTime;
-            delayTimer = BOBBER_FLIGHT_DELAY; // Wait for bobber to fly out
-
-            if (castAttempts > 1) {
-                sendDebugMessage("Recasting bobber (attempt " + castAttempts + "/" + MAX_CAST_ATTEMPTS + ") - waiting " + BOBBER_FLIGHT_DELAY + " ticks for flight");
-                sendFailsafeMessage("Recasting bobber (attempt " + castAttempts + "/" + MAX_CAST_ATTEMPTS + ")", false);
-            } else {
-                sendDebugMessage("Initial cast - waiting " + BOBBER_FLIGHT_DELAY + " ticks for bobber flight");
-            }
-        } catch (Exception e) {
-            castAttempts++;
-            consecutiveFailures++;
-            lastCastTime = currentTime;
-            sendFailsafeMessage("Failed to cast bobber: " + e.getMessage(), false);
-        }
-    }
-
     private static void performSingleClick(MinecraftClient client) {
         if (client.player == null) {
             consecutiveFailures++;
@@ -759,9 +697,7 @@ public class AutoFishingFeature {
         }
 
         try {
-            Hand hand = client.player.getStackInHand(Hand.MAIN_HAND).getItem() instanceof FishingRodItem ?
-                       Hand.MAIN_HAND : Hand.OFF_HAND;
-            simulateRightClick(client, hand);
+            simulateRightClick(client);
             lastSuccessfulFish = System.currentTimeMillis();
             consecutiveFailures = 0; // Reset failure count on successful interaction
         } catch (Exception e) {
@@ -770,44 +706,7 @@ public class AutoFishingFeature {
         }
     }
 
-    /**
-     * Simulates a right-click action using the item in the specified hand
-     * This mimics actual player input rather than sending direct packets
-     */
-    private static void simulateRightClick(MinecraftClient client, Hand hand) {
-        if (client.player == null || client.interactionManager == null) {
-            return;
-        }
 
-        try {
-            ItemStack itemStack = client.player.getStackInHand(hand);
-            if (itemStack.getItem() instanceof FishingRodItem) {
-                sendDebugMessage("Simulating right-click with " + hand + " hand using item directly");
-                
-                // Method 1: Use the item directly (most authentic approach)
-                ActionResult result = itemStack.use(client.world, client.player, hand);
-                sendDebugMessage("Direct item use result: " + result);
-                
-                // Method 2: If direct use doesn't work, try using interaction manager
-                // but only if the first method failed
-                if (result == ActionResult.FAIL || result == ActionResult.PASS) {
-                    sendDebugMessage("Direct use failed, trying interaction manager fallback");
-                    client.interactionManager.interactItem(client.player, hand);
-                }
-            } else {
-                sendDebugMessage("Warning: Attempted to simulate right-click with non-fishing rod item: " + itemStack.getItem());
-            }
-        } catch (Exception e) {
-            sendDebugMessage("Exception in simulateRightClick: " + e.getMessage());
-            // Fallback to interaction manager if all else fails
-            try {
-                client.interactionManager.interactItem(client.player, hand);
-                sendDebugMessage("Used interaction manager as final fallback");
-            } catch (Exception fallbackException) {
-                sendDebugMessage("All right-click simulation methods failed: " + fallbackException.getMessage());
-            }
-        }
-    }
 
     private static boolean detectArmorStandFishBite(MinecraftClient client) {
         if (client.player == null || client.world == null || !hasBobberInWater(client.player)) {
@@ -846,11 +745,96 @@ public class AutoFishingFeature {
         return false;
     }
 
+    // ======================== RANDOMIZED DELAY METHODS ========================
+    
+    /**
+     * ANTI-DETECTION FEATURE: Randomized Delays
+     * 
+     * These methods add variance to fishing delays to make the bot less detectable:
+     * - Recast Delay: ±20% variance (prevents predictable casting patterns)
+     * - Reeling Delay: ±15% variance (prevents predictable reeling patterns)
+     * 
+     * This mimics human behavior where reaction times naturally vary slightly.
+     */
+
+    /**
+     * Adds randomness to recast delay to make fishing less detectable
+     * Adds ±20% variance to the configured delay
+     */
+    private static int getRandomizedRecastDelay() {
+        float baseDelay = FishMasterConfig.getRecastDelay();
+        float variance = baseDelay * 0.2f; // ±20% variance
+        float randomOffset = (random.nextFloat() * 2f - 1f) * variance; // Random between -variance and +variance
+        int randomizedDelay = Math.round(baseDelay + randomOffset);
+        
+        // Ensure delay stays within reasonable bounds (minimum 2 ticks, maximum 50 ticks)
+        randomizedDelay = Math.max(2, Math.min(50, randomizedDelay));
+        
+        sendDebugMessage("Recast delay randomized: " + baseDelay + " -> " + randomizedDelay + " ticks (" + (randomizedDelay * 50) + "ms)");
+        return randomizedDelay;
+    }
+
+    /**
+     * Adds randomness to reeling delay to make fishing less detectable
+     * Adds ±15% variance to the configured delay
+     */
+    private static int getRandomizedReelingDelay() {
+        float baseDelay = FishMasterConfig.getReelingDelay();
+        float variance = baseDelay * 0.15f; // ±15% variance
+        float randomOffset = (random.nextFloat() * 2f - 1f) * variance; // Random between -variance and +variance
+        int randomizedDelay = Math.round(baseDelay + randomOffset);
+        
+        // Ensure delay stays within reasonable bounds (minimum 2 ticks, maximum 15 ticks)
+        randomizedDelay = Math.max(2, Math.min(15, randomizedDelay));
+        
+        sendDebugMessage("Reeling delay randomized: " + baseDelay + " -> " + randomizedDelay + " ticks (" + (randomizedDelay * 50) + "ms)");
+        return randomizedDelay;
+    }
+
 
     public static AutoFishingFeature getInstance() {
         if (instance == null) {
             instance = new AutoFishingFeature();
         }
         return instance;
+    }
+
+    // ======================== MOUSE SIMULATION METHODS ========================
+
+    /**
+     * Simulates a right-click using the MouseMixin accessor
+     * This provides more accurate mouse input simulation compared to interactItem
+     */
+    private static void simulateRightClick(MinecraftClient client) {
+        if (client == null || client.getWindow() == null) {
+            sendDebugMessage("simulateRightClick: Client or window is null");
+            return;
+        }
+
+        try {
+            long windowHandle = client.getWindow().getHandle();
+            
+            // Cast the Mouse instance to MouseMixin interface (applied via Mixin transformation)
+            MouseMixin mouseMixin = (MouseMixin) client.mouse;
+            
+            // Simulate right mouse button press
+            mouseMixin.invokeOnMouseButton(windowHandle, GLFW.GLFW_MOUSE_BUTTON_RIGHT, GLFW.GLFW_PRESS, 0);
+            sendDebugMessage("Right mouse button pressed via mixin");
+            
+            // Small delay to simulate human-like click duration
+            try {
+                Thread.sleep(10 + random.nextInt(20)); // 10-30ms delay
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            
+            // Simulate right mouse button release
+            mouseMixin.invokeOnMouseButton(windowHandle, GLFW.GLFW_MOUSE_BUTTON_RIGHT, GLFW.GLFW_RELEASE, 0);
+            sendDebugMessage("Right mouse button released via mixin - click simulation complete");
+            
+        } catch (Exception e) {
+            sendDebugMessage("simulateRightClick failed: " + e.getMessage());
+            consecutiveFailures++;
+        }
     }
 }
