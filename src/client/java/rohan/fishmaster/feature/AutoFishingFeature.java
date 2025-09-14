@@ -301,6 +301,14 @@ public class AutoFishingFeature {
             return;
         }
 
+        // If delayTimer just expired and we caught a fish, ensure proper state reset
+        if (justCaughtFish && delayTimer == 0) {
+            sendDebugMessage("Delay timer expired after fish catch - ensuring IDLE state");
+            currentState = FishingState.IDLE;
+            isFishing = false;
+            justCaughtFish = false; // Reset the flag now that delay is over
+        }
+
         if (castCooldownTimer > 0) {
             castCooldownTimer--;
             if (castCooldownTimer % 20 == 0) { // Debug message every second
@@ -402,7 +410,9 @@ public class AutoFishingFeature {
             case FISHING:
                 if (client.player.fishHook == null) {
                     if (justCaughtFish) {
-                        sendDebugMessage("Bobber disappeared after successful catch - this is expected, delayTimer should handle next cast");
+                        sendDebugMessage("Bobber disappeared after successful catch - transitioning to IDLE state");
+                        currentState = FishingState.IDLE;
+                        isFishing = false;
                     } else {
                         sendDebugMessage("Bobber disappeared unexpectedly - resetting state");
                         resetFishingState();
