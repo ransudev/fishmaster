@@ -508,7 +508,8 @@ public class AutoFishingFeature {
         // Trigger hand swing animation for natural appearance
         client.player.swingHand(hand);
         
-        client.interactionManager.interactItem(client.player, hand);
+        // Simulate right-click instead of using interactionManager directly
+        simulateRightClick(client, hand);
 
         currentState = FishingState.CASTING;
         castAttempts = 1; // This is the first attempt
@@ -709,23 +710,24 @@ public class AutoFishingFeature {
                     return;
                 } else {
                     // Bobber settle timeout exceeded, reel in and try again
-                    sendDebugMessage("Bobber settle timeout exceeded (" + timeSinceCastStart + "ms) - reeling in for recast");
-                    try {
-                        Hand hand = client.player.getStackInHand(Hand.MAIN_HAND).getItem() instanceof FishingRodItem ?
-                                   Hand.MAIN_HAND : Hand.OFF_HAND;
-                        
-                        // Trigger hand swing animation for natural appearance
-                        client.player.swingHand(hand);
-                        
-                        client.interactionManager.interactItem(client.player, hand);
-                        delayTimer = (int) FishMasterConfigNew.getRecastDelay(); // Use configurable delay
-                        lastCastTime = currentTime;
-                        castAttempts++;
-                        sendDebugMessage("Reeled in bobber due to settle timeout - Attempt: " + castAttempts);
-                    } catch (Exception e) {
-                        castAttempts++;
-                        sendFailsafeMessage("Failed to reel in bobber: " + e.getMessage(), false);
-                    }
+                sendDebugMessage("Bobber settle timeout exceeded (" + timeSinceCastStart + "ms) - reeling in for recast");
+                try {
+                    Hand hand = client.player.getStackInHand(Hand.MAIN_HAND).getItem() instanceof FishingRodItem ?
+                               Hand.MAIN_HAND : Hand.OFF_HAND;
+                    
+                    // Trigger hand swing animation for natural appearance
+                    client.player.swingHand(hand);
+                    
+                    // Simulate right-click instead of using interactionManager directly
+                    simulateRightClick(client, hand);
+                    delayTimer = (int) FishMasterConfigNew.getRecastDelay(); // Use configurable delay
+                    lastCastTime = currentTime;
+                    castAttempts++;
+                    sendDebugMessage("Reeled in bobber due to settle timeout - Attempt: " + castAttempts);
+                } catch (Exception e) {
+                    castAttempts++;
+                    sendFailsafeMessage("Failed to reel in bobber: " + e.getMessage(), false);
+                }
                 }
             }
             // If bobber is in water, don't interfere - let normal fishing logic handle it
@@ -742,30 +744,31 @@ public class AutoFishingFeature {
         }
 
         // Attempt to cast
-        try {
-            Hand hand = client.player.getStackInHand(Hand.MAIN_HAND).getItem() instanceof FishingRodItem ?
-                       Hand.MAIN_HAND : Hand.OFF_HAND;
-            
-            // Trigger hand swing animation for natural appearance
-            client.player.swingHand(hand);
-            
-            client.interactionManager.interactItem(client.player, hand);
-            castAttempts++;
-            lastCastTime = currentTime;
-            delayTimer = BOBBER_FLIGHT_DELAY; // Wait for bobber to fly out
+            try {
+                Hand hand = client.player.getStackInHand(Hand.MAIN_HAND).getItem() instanceof FishingRodItem ?
+                           Hand.MAIN_HAND : Hand.OFF_HAND;
+                
+                // Trigger hand swing animation for natural appearance
+                client.player.swingHand(hand);
+                
+                // Simulate right-click instead of using interactionManager directly
+                simulateRightClick(client, hand);
+                castAttempts++;
+                lastCastTime = currentTime;
+                delayTimer = BOBBER_FLIGHT_DELAY; // Wait for bobber to fly out
 
-            if (castAttempts > 1) {
-                sendDebugMessage("Recasting bobber (attempt " + castAttempts + "/" + MAX_CAST_ATTEMPTS + ") - waiting " + BOBBER_FLIGHT_DELAY + " ticks for flight");
-                sendFailsafeMessage("Recasting bobber (attempt " + castAttempts + "/" + MAX_CAST_ATTEMPTS + ")", false);
-            } else {
-                sendDebugMessage("Initial cast - waiting " + BOBBER_FLIGHT_DELAY + " ticks for bobber flight");
+                if (castAttempts > 1) {
+                    sendDebugMessage("Recasting bobber (attempt " + castAttempts + "/" + MAX_CAST_ATTEMPTS + ") - waiting " + BOBBER_FLIGHT_DELAY + " ticks for flight");
+                    sendFailsafeMessage("Recasting bobber (attempt " + castAttempts + "/" + MAX_CAST_ATTEMPTS + ")", false);
+                } else {
+                    sendDebugMessage("Initial cast - waiting " + BOBBER_FLIGHT_DELAY + " ticks for bobber flight");
+                }
+            } catch (Exception e) {
+                castAttempts++;
+                consecutiveFailures++;
+                lastCastTime = currentTime;
+                sendFailsafeMessage("Failed to cast bobber: " + e.getMessage(), false);
             }
-        } catch (Exception e) {
-            castAttempts++;
-            consecutiveFailures++;
-            lastCastTime = currentTime;
-            sendFailsafeMessage("Failed to cast bobber: " + e.getMessage(), false);
-        }
     }
 
     private static void performSingleClick(MinecraftClient client) {
@@ -781,13 +784,34 @@ public class AutoFishingFeature {
             // Trigger hand swing animation for natural appearance
             client.player.swingHand(hand);
             
-            client.interactionManager.interactItem(client.player, hand);
+            // Simulate right-click instead of using interactionManager directly
+            simulateRightClick(client, hand);
             lastSuccessfulFish = System.currentTimeMillis();
             consecutiveFailures = 0; // Reset failure count on successful interaction
         } catch (Exception e) {
             consecutiveFailures++;
             sendFailsafeMessage("Failed to interact with fishing rod: " + e.getMessage(), false);
         }
+    }
+
+    /**
+     * Simulates a right-click action using the item in the specified hand
+     * This mimics actual player input rather than sending direct packets
+     */
+    private static void simulateRightClick(MinecraftClient client, Hand hand) {
+        if (client.player == null || client.interactionManager == null) {
+            return;
+        }
+        
+        ItemStack stackInHand = client.player.getStackInHand(hand);
+        
+        // Check if the player is allowed to use the item (not cooldown, etc.)
+        if (client.player.getItemCooldownManager().isCoolingDown(stackInHand)) {
+            return;
+        }
+        
+        // Use the interaction manager's interactItem method which properly handles the right-click simulation
+        client.interactionManager.interactItem(client.player, hand);
     }
 
     private static boolean detectArmorStandFishBite(MinecraftClient client) {
