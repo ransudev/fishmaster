@@ -8,7 +8,6 @@ import net.minecraft.entity.passive.GlowSquidEntity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
-import net.minecraft.util.Hand;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
@@ -300,18 +299,22 @@ public class SeaCreatureKiller {
             } else {
                 // For melee modes, we can attack immediately
                 canAttack = true;
-                // Calculate look angles to target and smoothly rotate towards it
-                if (client.player != null) {
-                    double diffX = target.getX() - client.player.getX();
-                    double diffY = target.getY() + target.getHeight() / 2.0 - (client.player.getY() + client.player.getEyeHeight(client.player.getPose()));
-                    double diffZ = target.getZ() - client.player.getZ();
+                
+                // Only rotate for modes other than Fire Veil Wand
+                if (!"Fire Veil Wand".equals(mode)) {
+                    // Calculate look angles to target and smoothly rotate towards it
+                    if (client.player != null) {
+                        double diffX = target.getX() - client.player.getX();
+                        double diffY = target.getY() + target.getHeight() / 2.0 - (client.player.getY() + client.player.getEyeHeight(client.player.getPose()));
+                        double diffZ = target.getZ() - client.player.getZ();
 
-                    double dist = Math.sqrt(diffX * diffX + diffZ * diffZ);
-                    float yaw = (float)(Math.atan2(diffZ, diffX) * 180.0 / Math.PI) - 90.0f;
-                    float pitch = (float)-(Math.atan2(diffY, dist) * 180.0 / Math.PI);
+                        double dist = Math.sqrt(diffX * diffX + diffZ * diffZ);
+                        float yaw = (float)(Math.atan2(diffZ, diffX) * 180.0 / Math.PI) - 90.0f;
+                        float pitch = (float)-(Math.atan2(diffY, dist) * 180.0 / Math.PI);
 
-                    // Smoothly rotate towards the target
-                    rohan.fishmaster.utils.RotationHandler.getInstance().easeTo(yaw, pitch, 400L);
+                        // Smoothly rotate towards the target
+                        rohan.fishmaster.utils.RotationHandler.getInstance().easeTo(yaw, pitch, 400L);
+                    }
                 }
             }
 
@@ -330,8 +333,12 @@ public class SeaCreatureKiller {
             combatEndTime = System.currentTimeMillis();
             needsToSwitchBack = true;
 
-            // Always rotate back to original orientation after combat for legit visuals
-            startRotationTransition();
+            // Only rotate back to original orientation for modes other than Fire Veil Wand
+            String mode = FishMasterConfig.getSeaCreatureKillerMode();
+            if (!"Fire Veil Wand".equals(mode)) {
+                // Always rotate back to original orientation after combat for legit visuals
+                startRotationTransition();
+            }
 
             killCount++;
         }

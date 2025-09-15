@@ -4,6 +4,7 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.entity.Entity;
 import net.minecraft.item.ItemStack;
 
+
 /**
  * Fire Veil Wand mode
  * - Switches to the Fire Veil Wand (by display name contains "fire veil wand")
@@ -15,6 +16,7 @@ public class FireVeilWandMode extends SeaCreatureKillerMode {
 
     private static final long COOLDOWN_MS = 10000L; // 10 seconds
     private static long lastCastTime = 0L;
+
 
     @Override
     public void performAttack(Entity target) {
