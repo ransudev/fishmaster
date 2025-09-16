@@ -26,6 +26,7 @@ public class AutoFishingFeature {
     private static int reelingDelayTimer = 0; // New timer for reeling delay
     private static long lastDetectionTime = 0;
     private static boolean mouseWasGrabbed = false;
+    private static Boolean originalPauseOnLostFocus = null; // Store original pause setting
 
     // Debug mode variables
     private static boolean debugMode = false;
@@ -80,6 +81,8 @@ public class AutoFishingFeature {
             if (FishMasterConfig.isUngrabMouseWhenFishingEnabled()) {
                 restoreMouseGrab();
             }
+            // Restore original pause menu setting
+            restorePauseMenuSetting();
             emergencyStop = false;
             SeaCreatureKiller.setAutoFishEnabled(false);
             sendDebugMessage("Auto fishing stopped - SCK disabled, tracker remains active");
@@ -95,6 +98,8 @@ public class AutoFishingFeature {
             // Ungrab mouse if enabled in config (allows background usage)
             if (FishMasterConfig.isUngrabMouseWhenFishingEnabled()) {
                 ungrabMouse();
+                // Prevent pause menu from showing when window loses focus
+                preventPauseMenu();
             }
             sessionStartTime = System.currentTimeMillis();
             lastSuccessfulFish = sessionStartTime;
@@ -234,6 +239,44 @@ public class AutoFishingFeature {
 
     public static boolean isFishing() {
         return isFishing;
+    }
+
+    /**
+     * Temporarily modify game options to prevent pause menu from showing
+     * when auto fishing is enabled and mouse is ungrabbed
+     */
+    private static void preventPauseMenu() {
+        if (FishMasterConfig.isUngrabMouseWhenFishingEnabled()) {
+            MinecraftClient client = MinecraftClient.getInstance();
+            if (client.options != null) {
+                // Store the original pause setting
+                originalPauseOnLostFocus = client.options.pauseOnLostFocus;
+                // Temporarily disable pause on lost focus
+                client.options.pauseOnLostFocus = false;
+                sendDebugMessage("Pause menu prevention enabled - pauseOnLostFocus set to false");
+            }
+        }
+    }
+
+    /**
+     * Restore the original pause menu setting
+     */
+    private static void restorePauseMenuSetting() {
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (client.options != null && originalPauseOnLostFocus != null) {
+            client.options.pauseOnLostFocus = originalPauseOnLostFocus;
+            sendDebugMessage("Pause menu setting restored - pauseOnLostFocus set to " + originalPauseOnLostFocus);
+            originalPauseOnLostFocus = null;
+        }
+    }
+
+    /**
+     * Check if we should prevent the pause menu from showing
+     * This helps prevent the escape menu from interrupting fishing when window loses focus
+     */
+    public static boolean shouldPreventPauseMenu() {
+        // Only prevent pause menu when auto fishing is enabled and mouse ungrab is enabled
+        return enabled && FishMasterConfig.isUngrabMouseWhenFishingEnabled();
     }
 
     public static void tick() {
@@ -519,6 +562,8 @@ public class AutoFishingFeature {
         stop();
         sendFailsafeMessage("EMERGENCY STOP: " + reason, true);
         restoreMouseGrab();
+        // Restore original pause menu setting
+        restorePauseMenuSetting();
         // Disable sea creature killer when emergency stop occurs
         SeaCreatureKiller.setAutoFishEnabled(false);
         sendDebugMessage("Emergency stop complete - SCK disabled, mouse restored");
@@ -527,6 +572,30 @@ public class AutoFishingFeature {
     // Public method for keybind emergency stop
     public static void emergencyStop() {
         emergencyStopWithReason("Manual emergency stop via keybind");
+    }
+
+    /**
+     * Handle window focus changes to prevent escape menu from interrupting fishing
+     * @param isFocused Whether the window is now focused
+     */
+    public static void onWindowFocusChanged(boolean isFocused) {
+        if (!enabled) return;
+        
+        if (!isFocused) {
+            // Window lost focus - we might be switching to another application
+            // Keep the auto fishing running but ensure mouse stays ungrabbed
+            sendDebugMessage("Window lost focus - maintaining auto fishing state");
+            if (FishMasterConfig.isUngrabMouseWhenFishingEnabled()) {
+                ensureMouseUngrabbedIfEnabled();
+            }
+        } else {
+            // Window gained focus - restore normal operation
+            sendDebugMessage("Window gained focus - restoring auto fishing state");
+            // Re-ensure mouse is ungrabbed if that's what the user wants
+            if (FishMasterConfig.isUngrabMouseWhenFishingEnabled()) {
+                ensureMouseUngrabbedIfEnabled();
+            }
+        }
     }
 
     private static void sendFailsafeMessage(String message, boolean isError) {
@@ -583,6 +652,8 @@ public class AutoFishingFeature {
         reelingDelayTimer = 0; // Reset reeling delay timer
         lastDetectionTime = 0;
         justCaughtFish = false; // Reset catch flag when stopping
+        // Restore original pause menu setting
+        restorePauseMenuSetting();
         // Disable anti-AFK when stopping
         sendDebugMessage("Auto fishing stopped - Anti-AFK disabled");
     }
@@ -592,6 +663,8 @@ public class AutoFishingFeature {
         enabled = false;
         stop();
         restoreMouseGrab();
+        // Restore original pause menu setting
+        restorePauseMenuSetting();
         sendFailsafeMessage("Disconnected from server - auto fishing stopped", false);
         // Disable sea creature killer when disconnected
         SeaCreatureKiller.setAutoFishEnabled(false);

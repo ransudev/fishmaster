@@ -5,7 +5,8 @@
 	"client": [
 		"FishingBobberEntityMixin",
 		"InGameHudMixin",
-		"MouseMixin"
+		"MouseMixin",
+		"MinecraftClientMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1
