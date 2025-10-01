@@ -23,7 +23,6 @@ public class FishMasterClient implements ClientModInitializer {
         }
 
         try {
-            // Load enhanced config first
             FishMasterConfig.load();
 
             // Initialize keybindings FIRST - this is critical for preventing the crash
@@ -36,7 +35,6 @@ public class FishMasterClient implements ClientModInitializer {
             ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> {
                 FishMasterCommand.register(dispatcher);
             });
-
             // Initialize fishing events after keybindings are registered
             rohan.fishmaster.event.FishingEvents.register();
 
@@ -58,7 +56,7 @@ public class FishMasterClient implements ClientModInitializer {
                 if (client.player != null && client.world != null) {
                     AutoFishingFeature.tick();
                     rohan.fishmaster.feature.SeaCreatureKiller.tick();
-                    rohan.fishmaster.qol.AutoHarp.INSTANCE.tick(); // Add Auto Harp feature
+                    // rohan.fishmaster.qol.AutoHarp.INSTANCE.tick(); // TODO: Add Auto Harp feature when implemented
                 }
             });
 

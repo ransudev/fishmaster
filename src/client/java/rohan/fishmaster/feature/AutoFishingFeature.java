@@ -96,6 +96,12 @@ public class AutoFishingFeature {
             if (FishMasterConfig.isUngrabMouseWhenFishingEnabled()) {
                 ungrabMouse();
             }
+            
+            // Reset StrideSurfer mode if it's active (for new cycle)
+            if ("StrideSurfer".equals(FishMasterConfig.getSeaCreatureKillerMode())) {
+                SeaCreatureKiller.resetStrideSurferMode();
+            }
+            
             sessionStartTime = System.currentTimeMillis();
             lastSuccessfulFish = sessionStartTime;
             consecutiveFailures = 0;

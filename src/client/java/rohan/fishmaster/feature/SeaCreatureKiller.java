@@ -55,6 +55,7 @@ public class SeaCreatureKiller {
     private static SeaCreatureKillerMode currentMode;
     private static RCMMode rcmMode = new RCMMode();
     private static FireVeilWandMode fireVeilWandMode = new FireVeilWandMode();
+    private static StrideSurferMode strideSurferMode = new StrideSurferMode();
 
     // Set of specific sea creature names to target
     private static final Set<String> TARGET_CREATURES = new HashSet<>();
@@ -207,10 +208,22 @@ public class SeaCreatureKiller {
             case "Fire Veil Wand":
                 currentMode = fireVeilWandMode;
                 break;
+            case "StrideSurfer":
+                currentMode = strideSurferMode;
+                break;
             case "RCM":
             default:
                 currentMode = rcmMode;
                 break;
+        }
+    }
+
+    /**
+     * Reset StrideSurfer mode for a new cycle
+     */
+    public static void resetStrideSurferMode() {
+        if (strideSurferMode != null) {
+            strideSurferMode.resetForNewCycle();
         }
     }
 

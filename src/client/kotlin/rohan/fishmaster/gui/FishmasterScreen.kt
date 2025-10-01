@@ -1418,11 +1418,12 @@ class FishmasterScreen : WindowScreen(ElementaVersion.V5) {
     }
 
     private fun createModeSelector(): UIComponent {
-        val options = listOf("RCM", "Fire Veil Wand")
+        val options = listOf("RCM", "Fire Veil Wand", "StrideSurfer")
         val initial = ConfigBridge.getSeaCreatureKillerMode().let { if (options.contains(it)) it else "RCM" }
         
         return AnimatedCycleButton(options, initial) { selected ->
             ConfigBridge.setSeaCreatureKillerMode(selected)
+            
             // Announce chosen mode
             MinecraftClient.getInstance().player?.sendMessage(
                 Text.literal("[FishMaster] Sea Creature Killer mode set to: ")
