@@ -7,6 +7,9 @@ import rohan.fishmaster.feature.AutoFishingFeature;
 
 public class FishingEvents {
     public static void register() {
+        // Register window focus events
+        WindowFocusEvents.register();
+
         // Register tick event for fishing type detection and safety checks
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             KeyBindings.onKey(); // Handle keybind presses
